@@ -1,8 +1,6 @@
 const jwt_claims = {
   title: 'JWT personnalisé',
   description:
-    "Configurer des revendications JWT personnalisées à inclure dans le jeton d'accès. Ces revendications peuvent être utilisées pour transmettre des informations supplémentaires à votre application.",
-  description_with_id_token:
     "Personnalisez le jeton d'accès ou le jeton d'identité, fournissant des informations supplémentaires à votre application.",
   access_token: {
     card_title: "Jeton d'accès",
@@ -27,7 +25,7 @@ const jwt_claims = {
       "Le jeton d'identité est une assertion d'identité reçue après la connexion, contenant des revendications d'identité utilisateur pour que le client les utilise pour l'affichage ou la création de session.",
     card_field: "Jeton d'identité utilisateur",
     card_field_description:
-      "Les revendications OIDC standard (par exemple, sub, email, profile) sont toujours disponibles, tandis que les revendications définies par Logto doivent d'abord être activées ici. Dans les deux cas, vous devez demander les scopes correspondants lors de l'intégration de l'application pour les recevoir.",
+      "Les revendications 'sub', 'email', 'phone', 'profile' et 'address' sont toujours disponibles. Les autres revendications doivent d'abord être activées ici. Dans tous les cas, votre application doit demander les scopes correspondants lors de l'intégration pour les recevoir.",
   },
   code_editor_title: 'Personnalisez les revendications {{token}}',
   custom_jwt_create_button: 'Ajouter des revendications personnalisées',
@@ -55,7 +53,12 @@ const jwt_claims = {
   interaction_data: {
     title: "Contexte d'interaction utilisateur",
     subtitle:
-      "Utilisez le paramètre `context.interaction` pour accéder aux détails de l'interaction de l'utilisateur pour la session d'authentification en cours, y compris `interactionEvent`, `userId` et `verificationRecords`.",
+      "Utilisez le paramètre `context.interaction` pour accéder aux détails de l'interaction de l'utilisateur pour la session d'authentification en cours.",
+  },
+  application_data: {
+    title: "Contexte de l'application",
+    subtitle:
+      "Utilisez le paramètre d'entrée `context.application` pour fournir les informations d'application associées au jeton.",
   },
   token_data: {
     title: 'Données du jeton',

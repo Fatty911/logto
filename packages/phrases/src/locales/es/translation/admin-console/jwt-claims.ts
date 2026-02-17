@@ -1,8 +1,6 @@
 const jwt_claims = {
   title: 'JWT Personalizado',
   description:
-    'Configure los reclamos personalizados del JWT para incluir en el token de acceso. Estos reclamos se pueden usar para pasar información adicional a su aplicación.',
-  description_with_id_token:
     'Personalice el token de acceso o token de ID, proporcionando información adicional a su aplicación.',
   access_token: {
     card_title: 'Token de acceso',
@@ -26,7 +24,7 @@ const jwt_claims = {
       'El token de ID es una aserción de identidad recibida después del inicio de sesión, que contiene reclamos de identidad de usuario para que el cliente los use para la visualización o creación de sesión.',
     card_field: 'Token de ID de usuario',
     card_field_description:
-      'Los reclamos OIDC estándar (por ejemplo, sub, email, profile) siempre están disponibles, mientras que los reclamos definidos por Logto deben habilitarse primero aquí. En ambos casos, debe solicitar los scopes coincidentes durante la integración de la aplicación para recibirlos.',
+      "Los reclamos 'sub', 'email', 'phone', 'profile' y 'address' siempre están disponibles. Los demás reclamos deben habilitarse aquí primero. En todos los casos, su aplicación debe solicitar los scopes correspondientes durante la integración para recibirlos.",
   },
   code_editor_title: 'Personalizar los reclamos de {{token}}',
   custom_jwt_create_button: 'Añadir reclamos personalizados',
@@ -54,7 +52,12 @@ const jwt_claims = {
   interaction_data: {
     title: 'Contexto de interacción del usuario',
     subtitle:
-      'Use el parámetro `context.interaction` para acceder a los detalles de la interacción del usuario para la sesión de autenticación actual, incluidos `interactionEvent`, `userId` y `verificationRecords`.',
+      'Use el parámetro `context.interaction` para acceder a los detalles de la interacción del usuario para la sesión de autenticación actual.',
+  },
+  application_data: {
+    title: 'Contexto de la aplicación',
+    subtitle:
+      'Use el parámetro de entrada `context.application` para proporcionar la información de la aplicación asociada con el token.',
   },
   token_data: {
     title: 'Datos del token',

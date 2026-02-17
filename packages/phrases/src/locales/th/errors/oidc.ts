@@ -18,6 +18,12 @@ const oidc = {
   provider_error_fallback: 'เกิดข้อผิดพลาด OIDC: {{code}}',
   key_required: 'ต้องมีคีย์อย่างน้อยหนึ่งอัน',
   key_not_found: 'ไม่พบคีย์ที่มีรหัส {{id}}',
+  /** UNTRANSLATED */
+  invalid_session_payload: 'Invalid session payload.',
+  /** UNTRANSLATED */
+  session_not_found: 'Session not found.',
+  /** UNTRANSLATED */
+  invalid_session_account_id: 'Session accountId mismatch.',
 };
 
 export default Object.freeze(oidc);

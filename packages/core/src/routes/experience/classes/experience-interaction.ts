@@ -2,10 +2,10 @@
 import { appInsights } from '@logto/app-insights/node';
 import {
   InteractionEvent,
+  InteractionHookEvent,
   MfaFactor,
   VerificationType,
   type User,
-  type LogContextPayload,
   userPasskeySignInDataKey,
   userMfaDataKey,
 } from '@logto/schemas';
@@ -351,6 +351,7 @@ export default class ExperienceInteraction {
    * @throws {RequestError} with 404 if the if the user is not identified or not found
    * @throws {RequestError} with 403 if the mfa verification is required but not verified
    */
+
   public async guardMfaVerificationStatus(log?: LogEntry) {
     if (this.hasVerifiedSsoIdentity || this.hasVerifiedSignInWebAuthn) {
       return;
@@ -359,23 +360,25 @@ export default class ExperienceInteraction {
     const user = await this.getIdentifiedUser();
     const mfaSettings = await this.signInExperienceValidator.getMfaSettings();
     const adaptiveMfaResult = await this.adaptiveMfaValidator.getResult(user);
-    const requiresAdaptiveMfa = adaptiveMfaResult?.requiresMfa ?? false;
-    const mfaValidator = new MfaValidator(mfaSettings, user, {
-      forceMfaVerification: requiresAdaptiveMfa,
-    });
-    const mfaRequired = mfaValidator.isMfaEnabled;
-    const mfaRequirement: NonNullable<LogContextPayload['mfaRequirement']> = {
-      required: mfaRequired,
-      source: requiresAdaptiveMfa ? 'adaptive' : mfaRequired ? 'policy' : 'none',
-    };
-    log?.append({
-      ...conditional(adaptiveMfaResult && { adaptiveMfaResult }),
-      mfaRequirement,
-    });
-    const isVerified = mfaValidator.isMfaVerified(this.verificationRecordsArray);
+    const mfaValidator = new MfaValidator(mfaSettings, user, adaptiveMfaResult);
+
+    if (adaptiveMfaResult) {
+      log?.append({ adaptiveMfaResult });
+    }
+
+    if (!mfaValidator.isMfaRequired) {
+      return;
+    }
+
+    if (EnvSet.values.isDevFeaturesEnabled && adaptiveMfaResult?.requiresMfa) {
+      this.ctx.assignInteractionHookResult({
+        event: InteractionHookEvent.PostSignInAdaptiveMfaTriggered,
+        payload: { adaptiveMfaResult },
+        userId: user.id,
+      });
+    }
 
     const { primaryEmail, primaryPhone } = user;
-    // Build masked identifiers for UX hints when applicable
     const maskedIdentifiers: Record<string, string> = {
       ...(mfaValidator.availableUserMfaVerificationTypes.includes(
         MfaFactor.EmailVerificationCode
@@ -390,7 +393,7 @@ export default class ExperienceInteraction {
     };
 
     assertThat(
-      isVerified,
+      mfaValidator.isMfaVerified(this.verificationRecordsArray),
       new RequestError(
         { code: 'session.mfa.require_mfa_verification', status: 403 },
         {
@@ -515,7 +518,7 @@ export default class ExperienceInteraction {
       hasVerifiedSsoIdentity: this.hasVerifiedSsoIdentity,
     });
 
-    if (EnvSet.values.isDevFeaturesEnabled) {
+    if (EnvSet.values.isDevFeaturesEnabled && !this.hasVerifiedSsoIdentity) {
       // Check if passkey sign-in is enabled in the sign-in experience, if yes, check if user has `WebAuthn`
       // type of MFA verification record in `users.mfaVerifications`. Suggest user to add a passkey if not.
       await this.mfa.checkPasskeySignInAvailability();
