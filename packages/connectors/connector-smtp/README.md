@@ -36,9 +36,9 @@ A [Gmail official post](https://support.google.com/a/answer/176600) shows how to
 
 If you are using **Gmail** as your SMTP provider, please pay attention to the following settings to avoid connection errors:
 
-###### 1. Sender Name (HELO/EHLO validation)
+###### 1. Name (HELO/EHLO identity)
 Gmail's SMTP server requires the HELO/EHLO identity to be valid ASCII characters.
-*   **Do NOT** use non-ASCII characters (e.g., Chinese, Emoji) in the `Sender Name` field.
+*   **Do NOT** use non-ASCII characters (e.g., Chinese, Emoji) in the `name` field.
 *   **Error Reference**: `501-5.5.4 HELO/EHLO argument "..." invalid`
 *   **Recommended**: Use English names like "LobeChat" or "My App".
 
@@ -56,7 +56,6 @@ Choose one of the following combinations. **Do not mix them.**
 *   **Port**: `587`
 *   **Secure**: `Off` (False) -> *Important: Enabling Secure on 587 causes "wrong version number" error.*
 *   **RequireTLS**: `On` (True)
-*   
 
 ### Integrate with SendGrid SMTP API
 
