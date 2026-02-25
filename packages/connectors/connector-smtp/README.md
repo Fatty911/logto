@@ -32,6 +32,9 @@ We hope you can figure out all other email vendors' setups with the following ex
 You can get a new Gmail account at [Gmail](https://mail.google.com/), or you can use an existing account if you have one.
 
 A [Gmail official post](https://support.google.com/a/answer/176600) shows how to determine required properties' values to operate Gmail via an SMTP connector.
+
+See also: [Gmail SMTP server settings](https://support.google.com/a/answer/176793?hl=en) and [Sign in with App Passwords](https://support.google.com/accounts/answer/185833).
+
 #### Gmail Configuration Guide
 
 If you are using **Gmail** as your SMTP provider, please pay attention to the following settings to avoid connection errors:
