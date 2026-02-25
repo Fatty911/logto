@@ -1,11 +1,15 @@
+import { type IncomingHttpHeaders } from 'node:http';
+
 import { InteractionEvent, type User } from '@logto/schemas';
 
 import { mockUser } from '#src/__mocks__/user.js';
 import { EnvSet } from '#src/env-set/index.js';
+import { defaultInjectedHeaderMapping } from '#src/utils/injected-header-mapping.js';
 
 import type { SignInExperienceValidator } from '../sign-in-experience-validator.js';
 
 import { AdaptiveMfaValidator, adaptiveMfaNewCountryWindowDays } from './index.js';
+import { type AdaptiveMfaContext } from './types.js';
 
 const { jest } = import.meta;
 const originalIsDevFeaturesEnabled = EnvSet.values.isDevFeaturesEnabled;
@@ -40,6 +44,55 @@ const createSignInExperienceValidator = (enabled = true) =>
     }),
   }) as unknown as SignInExperienceValidator;
 
+const createInteractionContext = (user: User) => ({
+  getIdentifiedUser: jest.fn().mockResolvedValue(user),
+});
+
+/**
+ * Build request headers that `getInjectedHeaderValues()` can read and
+ * `parseAdaptiveMfaContext()` can parse back into (approximately) the same context.
+ *
+ * Note: This intentionally generates *strings* because HTTP headers are strings.
+ */
+const buildInjectedHeadersFromAdaptiveMfaContext = (
+  context: AdaptiveMfaContext
+): IncomingHttpHeaders => {
+  const headers = new Map<string, string>();
+
+  const set = (logicalKey: string, value: unknown) => {
+    const headerName = defaultInjectedHeaderMapping[logicalKey]?.trim().toLowerCase();
+    if (!headerName || value === undefined || value === null) {
+      return;
+    }
+
+    headers.set(headerName, String(value));
+  };
+
+  const { location, ipRiskSignals } = context;
+
+  if (location) {
+    // Keep semantics aligned with parseAdaptiveMfaContext normalization.
+    // Country should be ISO 3166-1 alpha-2, upper-case (if present).
+    set('country', location.country?.trim().toUpperCase());
+    set('city', location.city?.trim());
+    set('latitude', location.latitude);
+    set('longitude', location.longitude);
+  }
+
+  if (ipRiskSignals) {
+    set('botScore', ipRiskSignals.botScore);
+    set('botVerified', ipRiskSignals.botVerified);
+  }
+
+  return Object.fromEntries(headers);
+};
+
+const buildMockContext = (context: AdaptiveMfaContext) => ({
+  request: {
+    headers: buildInjectedHeadersFromAdaptiveMfaContext(context),
+  },
+});
+
 describe('AdaptiveMfaValidator', () => {
   beforeEach(() => {
     setDevFeaturesEnabled(true);
@@ -51,6 +104,9 @@ describe('AdaptiveMfaValidator', () => {
 
   it('triggers new country rule when current country is not in recent list', async () => {
     const now = new Date('2024-01-02T00:00:00Z');
+
+    jest.useFakeTimers().setSystemTime(now);
+
     const user: User = {
       ...mockUser,
       lastSignInAt: now.getTime() - 60 * 60 * 1000,
@@ -66,22 +122,26 @@ describe('AdaptiveMfaValidator', () => {
 
     const validator = new AdaptiveMfaValidator({
       queries,
+      interactionContext: createInteractionContext(user),
       signInExperienceValidator: createSignInExperienceValidator(),
+      ctx: buildMockContext({ location: { country: 'FR' } }),
     });
 
-    const result = await validator.getResult(user, {
-      now,
-      currentContext: { location: { country: 'FR' } },
-    });
+    const result = await validator.getResult();
 
     expect(result?.requiresMfa).toBe(true);
     expect(result?.triggeredRules).toEqual(
       expect.arrayContaining([expect.objectContaining({ rule: 'new_country' })])
     );
+
+    jest.useRealTimers();
   });
 
   it('triggers geo velocity rule when travel speed exceeds threshold', async () => {
     const now = new Date('2024-01-02T00:00:00Z');
+
+    jest.useFakeTimers().setSystemTime(now);
+
     const user: User = {
       ...mockUser,
       lastSignInAt: now.getTime() - 2 * 60 * 60 * 1000,
@@ -93,29 +153,33 @@ describe('AdaptiveMfaValidator', () => {
 
     const validator = new AdaptiveMfaValidator({
       queries,
+      interactionContext: createInteractionContext(user),
       signInExperienceValidator: createSignInExperienceValidator(),
-    });
-
-    const result = await validator.getResult(user, {
-      now,
-      currentContext: {
+      ctx: buildMockContext({
         location: {
           latitude: 50,
           longitude: 0,
           country: 'DE',
           city: 'Frankfurt',
         },
-      },
+      }),
     });
+
+    const result = await validator.getResult();
 
     expect(result?.requiresMfa).toBe(true);
     expect(result?.triggeredRules).toEqual(
       expect.arrayContaining([expect.objectContaining({ rule: 'geo_velocity' })])
     );
+
+    jest.useRealTimers();
   });
 
   it('triggers long inactivity rule after threshold', async () => {
     const now = new Date('2024-01-02T00:00:00Z');
+
+    jest.useFakeTimers().setSystemTime(now);
+
     const user: User = {
       ...mockUser,
       lastSignInAt: now.getTime() - 40 * 24 * 60 * 60 * 1000,
@@ -124,22 +188,25 @@ describe('AdaptiveMfaValidator', () => {
 
     const validator = new AdaptiveMfaValidator({
       queries,
+      interactionContext: createInteractionContext(user),
       signInExperienceValidator: createSignInExperienceValidator(),
     });
 
-    const result = await validator.getResult(user, {
-      now,
-      currentContext: {},
-    });
+    const result = await validator.getResult();
 
     expect(result?.requiresMfa).toBe(true);
     expect(result?.triggeredRules).toEqual(
       expect.arrayContaining([expect.objectContaining({ rule: 'long_inactivity' })])
     );
+
+    jest.useRealTimers();
   });
 
   it('triggers untrusted ip rule when bot score is low', async () => {
     const now = new Date('2024-01-02T00:00:00Z');
+
+    jest.useFakeTimers().setSystemTime(now);
+
     const user: User = {
       ...mockUser,
       lastSignInAt: null,
@@ -148,22 +215,23 @@ describe('AdaptiveMfaValidator', () => {
 
     const validator = new AdaptiveMfaValidator({
       queries,
+      interactionContext: createInteractionContext(user),
       signInExperienceValidator: createSignInExperienceValidator(),
-    });
-
-    const result = await validator.getResult(user, {
-      now,
-      currentContext: {
+      ctx: buildMockContext({
         ipRiskSignals: {
           botScore: 10,
         },
-      },
+      }),
     });
+
+    const result = await validator.getResult();
 
     expect(result?.requiresMfa).toBe(true);
     expect(result?.triggeredRules).toEqual(
       expect.arrayContaining([expect.objectContaining({ rule: 'untrusted_ip' })])
     );
+
+    jest.useRealTimers();
   });
 
   it('records geo location and country on sign-in when context has data', async () => {
@@ -185,6 +253,7 @@ describe('AdaptiveMfaValidator', () => {
     const validator = new AdaptiveMfaValidator({
       queries,
       ctx,
+      interactionContext: createInteractionContext(user),
       signInExperienceValidator: createSignInExperienceValidator(),
     });
 
@@ -220,6 +289,7 @@ describe('AdaptiveMfaValidator', () => {
     const validator = new AdaptiveMfaValidator({
       queries,
       ctx,
+      interactionContext: createInteractionContext(user),
       signInExperienceValidator: createSignInExperienceValidator(),
     });
 
@@ -249,6 +319,7 @@ describe('AdaptiveMfaValidator', () => {
       const validator = new AdaptiveMfaValidator({
         queries,
         ctx,
+        interactionContext: createInteractionContext(mockUser),
         signInExperienceValidator: createSignInExperienceValidator(),
       });
 
@@ -279,6 +350,7 @@ describe('AdaptiveMfaValidator', () => {
     const validator = new AdaptiveMfaValidator({
       queries,
       ctx,
+      interactionContext: createInteractionContext(user),
       signInExperienceValidator: createSignInExperienceValidator(false),
     });
 
@@ -317,6 +389,7 @@ describe('AdaptiveMfaValidator', () => {
     const validator = new AdaptiveMfaValidator({
       queries,
       ctx,
+      interactionContext: createInteractionContext(user),
       signInExperienceValidator: createSignInExperienceValidator(),
     });
 
@@ -346,6 +419,7 @@ describe('AdaptiveMfaValidator', () => {
     const validator = new AdaptiveMfaValidator({
       queries,
       ctx,
+      interactionContext: createInteractionContext(user),
       signInExperienceValidator: createSignInExperienceValidator(),
     });
 
