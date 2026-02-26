@@ -27,7 +27,19 @@ jobs:
         id: check
         run: |
           current=$(git rev-parse HEAD)
-          upstream=$(git rev-parse upstream/main)
+          
+          for branch in main master; do
+            if upstream=$(git rev-parse upstream/$branch 2>/dev/null); then
+              echo "upstream_branch=$branch" >> $GITHUB_OUTPUT
+              break
+            fi
+          done
+          
+          if [ -z "$upstream_branch" ]; then
+            echo "Error: Could not find upstream branch (tried main and master)" >&2
+            exit 1
+          fi
+          
           if [ "$current" != "$upstream" ]; then
             echo "need_sync=true" >> $GITHUB_OUTPUT
           else
@@ -39,5 +51,5 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git merge upstream/main --no-edit
+          git merge upstream/${{ steps.check.outputs.upstream_branch }} --no-edit
           git push
