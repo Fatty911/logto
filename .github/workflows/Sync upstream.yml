@@ -26,20 +26,23 @@ jobs:
       - name: Check if merge is needed
         id: check
         run: |
-          current=$(git rev-parse HEAD)
-          
-          for branch in main master; do
-            if upstream=$(git rev-parse upstream/$branch 2>/dev/null); then
-              echo "upstream_branch=$branch" >> $GITHUB_OUTPUT
-              break
-            fi
+          for upstream_branch in main master; do
+            for local_branch in main master; do
+              if git rev-parse "$local_branch" >/dev/null 2>&1 && \
+                 upstream=$(git rev-parse "upstream/$upstream_branch" 2>/dev/null); then
+                echo "upstream_branch=$upstream_branch" >> $GITHUB_OUTPUT
+                echo "local_branch=$local_branch" >> $GITHUB_OUTPUT
+                break 2
+              fi
+            done
           done
           
-          if [ -z "$upstream_branch" ]; then
-            echo "Error: Could not find upstream branch (tried main and master)" >&2
+          if [ -z "$upstream_branch" ] || [ -z "$local_branch" ]; then
+            echo "Error: Could not find valid branch combination (tried main/master for both upstream and local)" >&2
             exit 1
           fi
           
+          current=$(git rev-parse "$local_branch")
           if [ "$current" != "$upstream" ]; then
             echo "need_sync=true" >> $GITHUB_OUTPUT
           else
@@ -52,4 +55,4 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git merge upstream/${{ steps.check.outputs.upstream_branch }} --no-edit
-          git push
+          git push origin ${{ steps.check.outputs.local_branch }}
