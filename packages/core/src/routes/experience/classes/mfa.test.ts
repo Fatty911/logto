@@ -151,4 +151,76 @@ describe('Mfa.assertMfaFulfilled', () => {
 
     expect(getSignInExperienceDataSpy).not.toHaveBeenCalled();
   });
+
+  it('allows binding WebAuthn when passkey sign-in is enabled even if WebAuthn is not an MFA factor', async () => {
+    const { mfa } = createMfa();
+
+    const { signInExperienceValidator } = mfa as unknown as {
+      signInExperienceValidator: SignInExperienceValidator;
+    };
+
+    jest.spyOn(signInExperienceValidator, 'getSignInExperienceData').mockResolvedValue({
+      passkeySignIn: { enabled: true },
+    } as never);
+    jest
+      .spyOn(signInExperienceValidator, 'getMfaFactorsEnabledForBinding')
+      .mockResolvedValue([MfaFactor.TOTP]);
+
+    expect(async () => {
+      await (
+        mfa as unknown as {
+          checkMfaFactorsEnabledInSignInExperience: (factors: MfaFactor[]) => Promise<void>;
+        }
+      ).checkMfaFactorsEnabledInSignInExperience([MfaFactor.WebAuthn]);
+    }).not.toThrow();
+  });
+
+  it('returns non-skippable missing_mfa for adaptive no-skip policy', async () => {
+    const adaptiveNoSkipSettings: MfaSettings = {
+      policy: MfaPolicy.PromptAtSignInAndSignUpMandatory,
+      factors: [MfaFactor.TOTP],
+      organizationRequiredMfaPolicy: OrganizationRequiredMfaPolicy.NoPrompt,
+    };
+
+    const { mfa } = createMfa({
+      mfaSettings: adaptiveNoSkipSettings,
+      user: {
+        id: 'user-id',
+        logtoConfig: {},
+        mfaVerifications: [],
+      },
+    });
+
+    await expect(mfa.assertMfaFulfilled()).rejects.toMatchObject({
+      code: 'user.missing_mfa',
+      status: 422,
+      data: {
+        availableFactors: [MfaFactor.TOTP],
+      },
+    });
+  });
+});
+
+describe('Mfa.skip', () => {
+  it('rejects skip for adaptive no-skip policies', async () => {
+    const adaptiveNoSkipSettings: MfaSettings = {
+      policy: MfaPolicy.PromptOnlyAtSignInMandatory,
+      factors: [MfaFactor.TOTP],
+      organizationRequiredMfaPolicy: OrganizationRequiredMfaPolicy.NoPrompt,
+    };
+
+    const { mfa } = createMfa({
+      mfaSettings: adaptiveNoSkipSettings,
+      user: {
+        id: 'user-id',
+        logtoConfig: {},
+        mfaVerifications: [],
+      },
+    });
+
+    await expect(mfa.skip()).rejects.toMatchObject({
+      code: 'session.mfa.mfa_policy_not_user_controlled',
+      status: 422,
+    });
+  });
 });
