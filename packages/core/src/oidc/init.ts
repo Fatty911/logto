@@ -16,7 +16,7 @@ import {
   type LogtoUiCookie,
   ExtraParamsKey,
 } from '@logto/schemas';
-import { removeUndefinedKeys, trySafe, tryThat } from '@silverhand/essentials';
+import { conditional, removeUndefinedKeys, trySafe, tryThat } from '@silverhand/essentials';
 import { type i18n } from 'i18next';
 import { type KoaContextWithOIDC, Provider, errors } from 'oidc-provider';
 import getRawBody from 'raw-body';
@@ -44,6 +44,7 @@ import { type SubscriptionLibrary } from '../libraries/subscription.js';
 import koaTokenUsageGuard from '../middleware/koa-token-usage-guard.js';
 
 import defaults from './defaults.js';
+import { deviceFlowConfig, defaultDeviceCodeTtl } from './device-flow.js';
 import {
   getExtraTokenClaimsForJwtCustomization,
   getExtraTokenClaimsForOrganizationApiResource,
@@ -122,10 +123,7 @@ export default function initOidc(
       devInteractions: { enabled: false },
       clientCredentials: { enabled: true },
       backchannelLogout: { enabled: true },
-      // DEV: Device flow
-      deviceFlow: {
-        enabled: EnvSet.values.isDevFeaturesEnabled,
-      },
+      deviceFlow: deviceFlowConfig,
       rpInitiatedLogout: {
         logoutSource: (ctx, form) => {
           // eslint-disable-next-line no-template-curly-in-string
@@ -382,10 +380,11 @@ export default function initOidc(
 
         return 60 * 60; // 1 hour in seconds
       },
-      /** Align with the oidc-provider default (10 minutes). */
-      DeviceCode: 600 /* 10 minutes in seconds */,
+      DeviceCode: defaultDeviceCodeTtl,
       Interaction: 3600 /* 1 hour in seconds */,
-      Session: 1_209_600 /* 14 days in seconds */,
+      Session:
+        conditional(EnvSet.values.isDevFeaturesEnabled && envSet.oidc.sessionTtl) ??
+        defaults.sessionTtl /* 14 days in seconds */,
       // Set this to the longest allowed duration of the refresh token
       Grant: 180 * 3600 * 24 /* 180 days in seconds */,
     },
