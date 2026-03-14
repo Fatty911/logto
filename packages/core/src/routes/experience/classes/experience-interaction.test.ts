@@ -119,7 +119,8 @@ const createSignInInteraction = ({
   );
   // @ts-expect-error --mock test context
   const signInContext: WithHooksAndLogsContext = {
-    assignInteractionHookResult: jest.fn(),
+    assignReleaseOnSuccessInteractionHookResult: jest.fn(),
+    assignReleaseAnywayInteractionHookResult: jest.fn(),
     appendDataHookContext: jest.fn(),
     appendExceptionHookContext: jest.fn(),
     ...baseContext,
@@ -166,7 +167,8 @@ describe('ExperienceInteraction class', () => {
 
   // @ts-expect-error --mock test context
   const ctx: WithHooksAndLogsContext = {
-    assignInteractionHookResult: jest.fn(),
+    assignReleaseOnSuccessInteractionHookResult: jest.fn(),
+    assignReleaseAnywayInteractionHookResult: jest.fn(),
     appendDataHookContext: jest.fn(),
     ...createContextWithRouteParameters(),
     ...createMockLogContext(),
@@ -207,6 +209,9 @@ describe('ExperienceInteraction class', () => {
         {
           id: 'uid',
           primaryEmail: mockEmail,
+          logtoConfig: {
+            mfa: { enabled: false },
+          },
         },
         { isInteractive: true, roleNames: ['user', 'default:admin'] }
       );
