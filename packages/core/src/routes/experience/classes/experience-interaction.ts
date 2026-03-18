@@ -10,7 +10,6 @@ import {
 import { maskEmail, maskPhone } from '@logto/shared';
 import { conditional, trySafe } from '@silverhand/essentials';
 
-import { EnvSet } from '#src/env-set/index.js';
 import RequestError from '#src/errors/RequestError/index.js';
 import { type LogEntry } from '#src/middleware/koa-audit-log.js';
 import type TenantContext from '#src/tenants/TenantContext.js';
@@ -615,14 +614,12 @@ export default class ExperienceInteraction {
 
     // The geo context is only recorded when the `submit()` function succeeds.
     // The recorded geo context will affect the evaluation results of the adaptive MFA afterwards.
-    if (EnvSet.values.isDevFeaturesEnabled) {
-      void trySafe(
-        async () => this.adaptiveMfaValidator.recordSignInGeoContext(user, this.#interactionEvent),
-        (error) => {
-          void appInsights.trackException(error, buildAppInsightsTelemetry(this.ctx));
-        }
-      );
-    }
+    void trySafe(
+      async () => this.adaptiveMfaValidator.recordSignInGeoContext(user, this.#interactionEvent),
+      (error) => {
+        void appInsights.trackException(error, buildAppInsightsTelemetry(this.ctx));
+      }
+    );
 
     this.ctx.body = { redirectTo };
 
@@ -667,7 +664,7 @@ export default class ExperienceInteraction {
   }
 
   private assignAdaptiveMfaHookResult(userId: string, adaptiveMfaResult?: AdaptiveMfaResult) {
-    if (!EnvSet.values.isDevFeaturesEnabled || !adaptiveMfaResult?.requiresMfa) {
+    if (!adaptiveMfaResult?.requiresMfa) {
       return;
     }
 
