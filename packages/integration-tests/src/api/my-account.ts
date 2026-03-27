@@ -1,4 +1,5 @@
 import type {
+  GetUserApplicationGrantsResponse,
   GetUserSessionsResponse,
   GetThirdPartyAccessTokenResponse,
   SessionGrantRevokeTarget,
@@ -168,6 +169,29 @@ export const getSessions = async (api: KyInstance, verificationRecordId: string)
       headers: { [verificationRecordIdHeader]: verificationRecordId },
     })
     .json<GetUserSessionsResponse>();
+
+export const getMyAccountGrants = async (
+  api: KyInstance,
+  verificationRecordId: string,
+  appType?: 'firstParty' | 'thirdParty'
+) =>
+  api
+    .get('api/my-account/grants', {
+      searchParams: new URLSearchParams({
+        ...conditional(appType && { appType }),
+      }),
+      headers: { [verificationRecordIdHeader]: verificationRecordId },
+    })
+    .json<GetUserApplicationGrantsResponse>();
+
+export const revokeMyAccountGrant = async (
+  api: KyInstance,
+  grantId: string,
+  verificationRecordId: string
+) =>
+  api.delete(`api/my-account/grants/${grantId}`, {
+    headers: { [verificationRecordIdHeader]: verificationRecordId },
+  });
 
 export const deleteSession = async (
   api: KyInstance,
