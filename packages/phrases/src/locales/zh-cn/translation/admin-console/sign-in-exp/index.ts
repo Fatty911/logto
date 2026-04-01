@@ -42,6 +42,7 @@ const sign_in_exp = {
     hide_logto_branding: '隐藏 Logto 品牌',
     hide_logto_branding_description:
       '移除“Powered by Logto”。以干净、专业的登录体验专属呈现你的品牌。',
+    hide_logto_branding_oss_note: '此功能原生支持于 <a>Logto Cloud</a>。',
   },
   branding_uploads: {
     app_logo: {
@@ -170,6 +171,8 @@ const sign_in_exp = {
     webauthn_related_origins: 'WebAuthn 关联来源',
     webauthn_related_origins_description: '添加允许通过 Account API 注册通行密钥的前端应用域名。',
     webauthn_related_origins_error: '来源必须以 https:// 或 http:// 开头',
+    delete_account_url: '删除账号',
+    delete_account_url_description: '提供你自己的端点 URL，用自定义逻辑处理账号删除。',
     prebuilt_ui: {
       title: '集成预构建 UI',
       description: '使用预构建 UI 快速集成开箱即用的验证和安全设置流程。',

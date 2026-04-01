@@ -46,6 +46,8 @@ const sign_in_exp = {
     hide_logto_branding: 'Masquer la marque Logto',
     hide_logto_branding_description:
       'Supprimez "Powered by Logto". Mettez uniquement votre marque en avant avec une expérience de connexion claire et professionnelle.',
+    hide_logto_branding_oss_note:
+      'Cette fonctionnalité est disponible nativement dans <a>Logto Cloud</a>.',
   },
   branding_uploads: {
     app_logo: {
@@ -179,6 +181,9 @@ const sign_in_exp = {
     webauthn_related_origins_description:
       'Ajoutez les domaines de vos applications front-end autorisés à enregistrer des passkeys via l’API Account.',
     webauthn_related_origins_error: "L'origine doit commencer par https:// ou http://",
+    delete_account_url: 'Supprimer le compte',
+    delete_account_url_description:
+      'Fournissez votre propre URL de point de terminaison pour gérer la suppression du compte avec une logique personnalisée.',
     prebuilt_ui: {
       title: "INTÉGRER L'INTERFACE UTILISATEUR PRÉCONSTRUITE",
       description:

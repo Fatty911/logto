@@ -42,6 +42,7 @@ const sign_in_exp = {
     hide_logto_branding: 'Logto 브랜딩 숨기기',
     hide_logto_branding_description:
       '"Powered by Logto" 문구를 제거하고 깔끔하고 전문적인 로그인 경험에서 브랜드만 돋보이게 하세요.',
+    hide_logto_branding_oss_note: '이 기능은 <a>Logto Cloud</a>에서 기본 제공됩니다.',
   },
   branding_uploads: {
     app_logo: {
@@ -173,6 +174,9 @@ const sign_in_exp = {
     webauthn_related_origins_description:
       'Account API를 통해 패스키를 등록할 수 있도록 허용된 프런트엔드 애플리케이션 도메인을 추가하세요.',
     webauthn_related_origins_error: '오리진은 https:// 또는 http:// 로 시작해야 합니다',
+    delete_account_url: '계정 삭제',
+    delete_account_url_description:
+      '맞춤 로직으로 계정 삭제를 처리할 자체 엔드포인트 URL을 제공하세요.',
     prebuilt_ui: {
       title: '기본 제공 UI 통합',
       description: '기본 제공 UI 를 사용하여 즉시 검증 및 보안 설정 흐름을 빠르게 통합하세요.',

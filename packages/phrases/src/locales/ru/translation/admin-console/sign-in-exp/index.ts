@@ -45,6 +45,7 @@ const sign_in_exp = {
     hide_logto_branding: 'Скрыть брендинг Logto',
     hide_logto_branding_description:
       'Удалите надпись "Powered by Logto". Подчеркните только свой бренд с помощью чистого и профессионального процесса входа.',
+    hide_logto_branding_oss_note: 'Эта функция нативно доступна в <a>Logto Cloud</a>.',
   },
   branding_uploads: {
     app_logo: {
@@ -177,6 +178,9 @@ const sign_in_exp = {
     webauthn_related_origins_description:
       'Добавьте домены ваших фронтенд-приложений, которым разрешено регистрировать passkey через Account API.',
     webauthn_related_origins_error: 'Источник должен начинаться с https:// или http://',
+    delete_account_url: 'Удалить аккаунт',
+    delete_account_url_description:
+      'Укажите собственный URL конечной точки, чтобы обрабатывать удаление аккаунта с пользовательской логикой.',
     prebuilt_ui: {
       title: 'ИСПОЛЬЗОВАТЬ ГОТОВЫЙ ИНТЕРФЕЙС',
       description:

@@ -49,6 +49,7 @@ export type AccountCenterFormValues = {
   enabled: boolean;
   fields: Record<AccountCenterFieldKey, AccountCenterControlValue>;
   webauthnRelatedOrigins: string[];
+  deleteAccountUrl: string;
 };
 
 const createDefaultAccountCenterFormValues = (): AccountCenterFormValues => ({
@@ -58,10 +59,13 @@ const createDefaultAccountCenterFormValues = (): AccountCenterFormValues => ({
     accountCenterFieldKeys.map((key) => [key, AccountCenterControlValue.Off])
   ) as Record<AccountCenterFieldKey, AccountCenterControlValue>,
   webauthnRelatedOrigins: [],
+  deleteAccountUrl: '',
 });
 
 export const normalizeWebauthnRelatedOrigins = (origins?: string[]): string[] =>
   origins?.map((origin) => origin.trim()).filter(Boolean) ?? [];
+
+export const normalizeDeleteAccountUrl = (url?: string): string => url?.trim() ?? '';
 
 export const convertAccountCenterToForm = (
   accountCenter?: AccountCenterConfig
@@ -72,6 +76,7 @@ export const convertAccountCenterToForm = (
     ...accountCenter?.fields,
   },
   webauthnRelatedOrigins: normalizeWebauthnRelatedOrigins(accountCenter?.webauthnRelatedOrigins),
+  deleteAccountUrl: normalizeDeleteAccountUrl(accountCenter?.deleteAccountUrl ?? undefined),
 });
 
 /**
@@ -125,4 +130,9 @@ export type SignInMethodsObject = Record<
  * - Those keys should be omitted from the submitted data.
  * - Those keys should not be used in any data comparison logic.
  */
-export type SignInExperiencePageManagedData = Omit<SignInExperience, OmittedSignInExperienceKeys>;
+export type SignInExperiencePageManagedData = Omit<
+  SignInExperience,
+  OmittedSignInExperienceKeys | 'hideLogtoBranding'
+> & {
+  hideLogtoBranding?: boolean;
+};

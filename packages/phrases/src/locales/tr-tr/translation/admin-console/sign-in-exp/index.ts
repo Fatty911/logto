@@ -45,6 +45,8 @@ const sign_in_exp = {
     hide_logto_branding: 'Logto markasını gizle',
     hide_logto_branding_description:
       '"Powered by Logto" ibaresini kaldırın. Temiz ve profesyonel bir oturum açma deneyimiyle yalnızca kendi markanızı öne çıkarın.',
+    hide_logto_branding_oss_note:
+      'Bu özellik <a>Logto Cloud</a> içinde yerel olarak kullanılabilir.',
   },
   branding_uploads: {
     app_logo: {
@@ -176,6 +178,9 @@ const sign_in_exp = {
     webauthn_related_origins_description:
       'Account API aracılığıyla passkey kaydedilmesine izin verilen ön uç uygulamalarınızın alan adlarını ekleyin.',
     webauthn_related_origins_error: 'Kaynak https:// veya http:// ile başlamalıdır',
+    delete_account_url: 'Hesabı sil',
+    delete_account_url_description:
+      'Hesap silme işlemini özel mantıkla yönetmek için kendi uç nokta URL’nizi sağlayın.',
     prebuilt_ui: {
       title: 'ÖN TANIMLI ARAYÜZÜ ENTEGRE ET',
       description:

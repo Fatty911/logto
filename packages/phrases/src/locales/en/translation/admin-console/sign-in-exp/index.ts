@@ -45,6 +45,7 @@ const sign_in_exp = {
     hide_logto_branding: 'Hide Logto branding',
     hide_logto_branding_description:
       'Remove "Powered by Logto". Spotlight your brand exclusively with a clean, professional sign-in experience.',
+    hide_logto_branding_oss_note: 'This feature is natively available in <a>Logto Cloud</a>.',
   },
   branding_uploads: {
     app_logo: {
@@ -177,6 +178,9 @@ const sign_in_exp = {
     webauthn_related_origins_description:
       'Add the domains of your front-end applications that are allowed to register passkeys via the Account API.',
     webauthn_related_origins_error: 'Origin must start with https:// or http://',
+    delete_account_url: 'Delete account',
+    delete_account_url_description:
+      'Provide your own endpoint URL to handle account deletion with custom logic.',
     prebuilt_ui: {
       title: 'INTEGRATE PREBUILT UI',
       description:
