@@ -104,9 +104,9 @@ const sign_in_exp = {
   account_center: {
     title: 'CENTRO DE CUENTAS',
     description: 'Personaliza los flujos de tu centro de cuentas usando las API de Logto.',
-    enable_account_api: 'Habilitar la Account API',
+    enable_account_api: 'Habilitar el centro de cuentas y la Account API',
     enable_account_api_description:
-      'Activa la Account API para crear un centro de cuentas personalizado y ofrecer a los usuarios finales acceso directo a la API sin utilizar la Logto Management API.',
+      'Activa tanto la Account API para usuarios finales como el centro de cuenta listo para usar de Logto. Si se desactiva, ambas funciones no estarán disponibles.',
     field_options: {
       off: 'Desactivado',
       edit: 'Editar',
@@ -193,7 +193,7 @@ const sign_in_exp = {
         'Para integrar estos flujos prediseñados, establezca los permisos de la API de cuenta relacionados en <strong>Editar</strong> en la configuración a continuación.',
       account_center_title: 'Integrar el centro de cuenta listo para usar',
       account_center_description:
-        'Dirige a los usuarios al portal de gestión de cuenta completo con todas las funciones.',
+        'Dirige a los usuarios al centro de cuentas para gestionar la configuración de seguridad como correo electrónico, teléfono, nombre de usuario, contraseña, MFA y cuentas conectadas.',
       flows_title: 'Integra flujos de configuración de seguridad predefinidos',
       single_task_flows_title: 'Integrar un flujo de tarea única listo para usar',
       flows_description:
@@ -215,7 +215,7 @@ const sign_in_exp = {
         backup_codes_generate: 'Generar un nuevo conjunto de 10 códigos de respaldo',
         backup_codes_manage: 'Ver tus códigos de respaldo disponibles o generar nuevos',
         account_center:
-          'Accede al portal de gestión de cuenta completo con todas las configuraciones de seguridad',
+          'Accede al centro de cuentas para gestionar la configuración de seguridad como correo electrónico, teléfono, nombre de usuario, contraseña, MFA y cuentas conectadas',
       },
       customize_note: '¿No quieres la experiencia predefinida? Puedes',
       customize_link: 'personalizar totalmente tus flujos con la Account API.',

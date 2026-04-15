@@ -101,9 +101,9 @@ const sign_in_exp = {
   account_center: {
     title: 'CENTRUM KONTA',
     description: 'Dostosuj przepływy centrum konta z wykorzystaniem interfejsów API Logto.',
-    enable_account_api: 'Włącz Account API',
+    enable_account_api: 'Włącz centrum konta i Account API',
     enable_account_api_description:
-      'Włącz Account API, aby zbudować własne centrum konta i zapewnić użytkownikom końcowym bezpośredni dostęp do API bez użycia Logto Management API.',
+      'Włącza zarówno Account API dla użytkowników końcowych, jak i gotowe centrum konta Logto. Po wyłączeniu obie funkcje są niedostępne.',
     field_options: {
       off: 'Wyłączone',
       edit: 'Edytuj',
@@ -189,7 +189,7 @@ const sign_in_exp = {
         'Aby zintegrować te gotowe przepływy, ustaw powiązane uprawnienia Account API na <strong>Edytuj</strong> w ustawieniach poniżej.',
       account_center_title: 'Zintegruj gotowe centrum konta',
       account_center_description:
-        'Kieruj użytkowników do kompletnego portalu zarządzania kontem ze wszystkimi funkcjami.',
+        'Kieruj użytkowników do centrum konta, aby zarządzać ustawieniami bezpieczeństwa, takimi jak e-mail, telefon, nazwa użytkownika, hasło, MFA i połączone konta.',
       flows_title: 'Integruj gotowe przepływy ustawień bezpieczeństwa',
       single_task_flows_title: 'Zintegruj gotowy przepływ pojedynczego zadania',
       flows_description:
@@ -211,7 +211,7 @@ const sign_in_exp = {
         backup_codes_generate: 'Wygeneruj nowy zestaw 10 kodów zapasowych',
         backup_codes_manage: 'Zobacz dostępne kody zapasowe lub wygeneruj nowe',
         account_center:
-          'Uzyskaj dostęp do kompletnego portalu zarządzania kontem ze wszystkimi ustawieniami bezpieczeństwa',
+          'Uzyskaj dostęp do centrum konta, aby zarządzać ustawieniami bezpieczeństwa, takimi jak e-mail, telefon, nazwa użytkownika, hasło, MFA i połączone konta',
       },
       customize_note: 'Nie chcesz korzystać z gotowego rozwiązania? Możesz całkowicie',
       customize_link: 'dostosować swoje przepływy za pomocą Account API.',

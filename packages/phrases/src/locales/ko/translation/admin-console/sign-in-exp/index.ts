@@ -98,9 +98,9 @@ const sign_in_exp = {
   account_center: {
     title: '계정 센터',
     description: 'Logto API로 계정 센터 플로우를 사용자 지정하세요.',
-    enable_account_api: 'Account API 활성화',
+    enable_account_api: '계정 센터와 Account API 활성화',
     enable_account_api_description:
-      'Account API를 활성화하여 맞춤형 계정 센터를 구축하고, Logto 관리 API 없이도 최종 사용자에게 직접 API 접근을 제공합니다.',
+      '최종 사용자용 Account API와 Logto의 즉시 제공되는 계정 센터를 함께 활성화합니다. 끄면 두 기능 모두 사용할 수 없습니다.',
     field_options: {
       off: '끄기',
       edit: '편집',
@@ -184,7 +184,8 @@ const sign_in_exp = {
       permission_notice:
         '이 사전 구축된 흐름을 통합하려면 아래 설정에서 관련 계정 API 권한을 <strong>편집</strong>으로 설정하세요.',
       account_center_title: '즉시 제공되는 계정 센터 통합',
-      account_center_description: '모든 기능을 갖춘 완전한 계정 관리 포털로 사용자를 라우팅합니다.',
+      account_center_description:
+        '사용자를 계정 센터로 라우팅하여 이메일, 전화번호, 사용자 이름, 비밀번호, MFA 및 연결된 계정 등 보안 설정을 관리합니다.',
       flows_title: '기본 제공 보안 설정 흐름 통합',
       single_task_flows_title: '즉시 제공되는 단일 작업 흐름 통합',
       flows_description:
@@ -204,7 +205,8 @@ const sign_in_exp = {
         passkey_manage: '기존 패스키 관리 또는 새 패스키 추가',
         backup_codes_generate: '새로운 10 개의 백업 코드 세트 생성',
         backup_codes_manage: '사용 가능한 백업 코드 보기 또는 새로 생성',
-        account_center: '모든 보안 설정을 갖춘 완전한 계정 관리 포털에 액세스',
+        account_center:
+          '계정 센터에 액세스하여 이메일, 전화번호, 사용자 이름, 비밀번호, MFA 및 연결된 계정 등 보안 설정 관리',
       },
       customize_note: '기본 제공 경험이 원치 않으시나요? 대신 계정 API 를 사용하여',
       customize_link: '흐름을 완전히 사용자화할 수 있습니다.',

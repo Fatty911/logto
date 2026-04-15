@@ -102,9 +102,9 @@ const sign_in_exp = {
   account_center: {
     title: 'CENTRO ACCOUNT',
     description: 'Personalizza i flussi del centro account con le API Logto.',
-    enable_account_api: 'Abilita l’Account API',
+    enable_account_api: 'Abilita il centro account e l’Account API',
     enable_account_api_description:
-      'Abilita l’Account API per creare un centro account personalizzato e offrire agli utenti finali l’accesso diretto all’API senza utilizzare la Logto Management API.',
+      'Abilita insieme l’Account API per gli utenti finali e il centro account predefinito di Logto. Se disattivato, entrambe le funzionalità non sono disponibili.',
     field_options: {
       off: 'Disattivato',
       edit: 'Modifica',
@@ -190,7 +190,7 @@ const sign_in_exp = {
         "Per integrare questi flussi predefiniti, imposta i permessi dell'API account correlati su <strong>Modifica</strong> nelle impostazioni sottostanti.",
       account_center_title: 'Integra il centro account predefinito',
       account_center_description:
-        'Combina il tuo dominio con il percorso per formare il tuo URL del centro account (ad es., https://auth.foo.com/account). Opzionalmente aggiungi `redirect=` per riportare gli utenti alla tua app dopo il logout, o `ui_locales=` per sovrascrivere la lingua predefinita.',
+        'Indirizza gli utenti al centro account per gestire le impostazioni di sicurezza come email, telefono, nome utente, password, MFA e account collegati.',
       flows_title: 'Integra i flussi di impostazione di sicurezza predefiniti',
       single_task_flows_title: 'Integra i flussi di aggiornamento profilo singolo predefiniti',
       flows_description:
@@ -212,7 +212,7 @@ const sign_in_exp = {
         backup_codes_generate: 'Genera un nuovo set di 10 codici di backup',
         backup_codes_manage: 'Visualizza i codici di backup disponibili o genera nuovi codici',
         account_center:
-          'Gestisci il tuo profilo, le impostazioni di sicurezza e le sessioni nel centro account',
+          'Accedi al centro account per gestire le impostazioni di sicurezza come email, telefono, nome utente, password, MFA e account collegati',
       },
       customize_note: 'Non vuoi l’esperienza predefinita? Puoi completamente',
       customize_link: 'personalizzare i tuoi flussi con l’Account API invece.',
