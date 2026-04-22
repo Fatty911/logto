@@ -11,7 +11,9 @@ import {
   getImmediatelyRotatedOidcPrivateKeys,
   getOidcPrivateKeysAfterDeletion,
   getOidcProviderPrivateKeys,
+  getStagedRotatedOidcPrivateKeys,
   normalizeOidcPrivateKeys,
+  rotateOidcPrivateKeyStatuses,
 } from './oidc-private-key.js';
 
 const { jest } = import.meta;
@@ -121,6 +123,65 @@ describe('getImmediatelyRotatedOidcPrivateKeys', () => {
   });
 });
 
+describe('getStagedRotatedOidcPrivateKeys', () => {
+  it('persists the new key as Next while preserving Current and Previous', () => {
+    const result = getStagedRotatedOidcPrivateKeys(
+      [
+        createPrivateKey('current', 2, OidcSigningKeyStatus.Current),
+        createPrivateKey('previous', 1, OidcSigningKeyStatus.Previous),
+      ],
+      createPrivateKey('new', 3)
+    );
+
+    expect(result).toEqual([
+      createPrivateKey('new', 3, OidcSigningKeyStatus.Next),
+      createPrivateKey('current', 2, OidcSigningKeyStatus.Current),
+      createPrivateKey('previous', 1, OidcSigningKeyStatus.Previous),
+    ]);
+  });
+
+  it('replaces any existing Next key instead of accumulating a fourth private key', () => {
+    const result = getStagedRotatedOidcPrivateKeys(
+      [
+        createPrivateKey('next', 4, OidcSigningKeyStatus.Next),
+        createPrivateKey('current', 3, OidcSigningKeyStatus.Current),
+        createPrivateKey('previous', 2, OidcSigningKeyStatus.Previous),
+      ],
+      createPrivateKey('replacement', 5)
+    );
+
+    expect(result).toEqual([
+      createPrivateKey('replacement', 5, OidcSigningKeyStatus.Next),
+      createPrivateKey('current', 3, OidcSigningKeyStatus.Current),
+      createPrivateKey('previous', 2, OidcSigningKeyStatus.Previous),
+    ]);
+  });
+});
+
+describe('rotateOidcPrivateKeyStatuses', () => {
+  it('promotes Next to Current and demotes Current to Previous', () => {
+    const result = rotateOidcPrivateKeyStatuses([
+      createPrivateKey('next', 3, OidcSigningKeyStatus.Next),
+      createPrivateKey('current', 2, OidcSigningKeyStatus.Current),
+      createPrivateKey('previous', 1, OidcSigningKeyStatus.Previous),
+    ]);
+
+    expect(result).toEqual([
+      createPrivateKey('next', 3, OidcSigningKeyStatus.Current),
+      createPrivateKey('current', 2, OidcSigningKeyStatus.Previous),
+    ]);
+  });
+
+  it('returns the original normalized keys when there is no staged Next key', () => {
+    const privateKeys = [
+      createPrivateKey('current', 2, OidcSigningKeyStatus.Current),
+      createPrivateKey('previous', 1, OidcSigningKeyStatus.Previous),
+    ];
+
+    expect(rotateOidcPrivateKeyStatuses(privateKeys)).toBe(privateKeys);
+  });
+});
+
 describe('getOidcPrivateKeysAfterDeletion', () => {
   it('promotes the remaining key to Current after deleting Previous from the immediate flow', () => {
     const result = getOidcPrivateKeysAfterDeletion(
@@ -163,7 +224,7 @@ describe('OidcPrivateKeyLibrary', () => {
     );
   });
 
-  it('rotates private signing keys inside a locked transaction', async () => {
+  it('rotates private signing keys immediately inside a locked transaction', async () => {
     methods.query.mockResolvedValueOnce({ rows: [] } as never).mockResolvedValueOnce({
       rows: [
         {
@@ -180,7 +241,7 @@ describe('OidcPrivateKeyLibrary', () => {
       ],
     } as never);
 
-    const result = await library.rotatePrivateSigningKeys(createPrivateKey('new', 3));
+    const result = await library.rotatePrivateSigningKeys(createPrivateKey('new', 3), 0);
 
     expect(methods.transaction).toHaveBeenCalledTimes(1);
     expect(methods.query).toHaveBeenCalledTimes(2);
@@ -188,6 +249,53 @@ describe('OidcPrivateKeyLibrary', () => {
     expect(result).toEqual([
       createPrivateKey('new', 3, OidcSigningKeyStatus.Current),
       createPrivateKey('current', 2, OidcSigningKeyStatus.Previous),
+    ]);
+  });
+
+  it('stages private signing key rotation inside a locked transaction', async () => {
+    methods.query
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            key: 'oidc.privateKeys',
+            value: [
+              createPrivateKey('current', 2, OidcSigningKeyStatus.Current),
+              createPrivateKey('previous', 1, OidcSigningKeyStatus.Previous),
+            ],
+          },
+        ],
+      } as never)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            key: 'signingKeyRotationState',
+            value: { signingKeyRotationAt: 2 },
+          },
+        ],
+      } as never);
+    methods.one
+      .mockResolvedValueOnce({
+        key: 'oidc.privateKeys',
+        value: [
+          createPrivateKey('new', 3, OidcSigningKeyStatus.Next),
+          createPrivateKey('current', 2, OidcSigningKeyStatus.Current),
+          createPrivateKey('previous', 1, OidcSigningKeyStatus.Previous),
+        ],
+      } as never)
+      .mockResolvedValueOnce({
+        value: { signingKeyRotationAt: 456 },
+      } as never);
+
+    const result = await library.rotatePrivateSigningKeys(createPrivateKey('new', 3), 60);
+
+    expect(methods.transaction).toHaveBeenCalledTimes(1);
+    expect(methods.query).toHaveBeenCalledTimes(3);
+    expect(methods.one).toHaveBeenCalledTimes(2);
+    expect(result).toEqual([
+      createPrivateKey('new', 3, OidcSigningKeyStatus.Next),
+      createPrivateKey('current', 2, OidcSigningKeyStatus.Current),
+      createPrivateKey('previous', 1, OidcSigningKeyStatus.Previous),
     ]);
   });
 
