@@ -13,6 +13,10 @@ const oss_onboarding = {
     personal: '個人項目',
     company: '公司項目',
   },
+  project_name: {
+    label: '項目名稱',
+    placeholder: '我的項目',
+  },
   company_name: {
     label: '公司名稱',
     placeholder: 'Acme.co',
@@ -23,8 +27,7 @@ const oss_onboarding = {
   errors: {
     email_required: '電郵地址為必填項',
     email_invalid: '請輸入有效的電郵地址',
-    company_name_required: '公司名稱為必填項',
-    company_size_required: '公司規模為必填項',
+    project_name_too_long: '項目名稱不能超過 200 個字元',
   },
 };
 

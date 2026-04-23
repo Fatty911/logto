@@ -14,6 +14,10 @@ const oss_onboarding = {
     personal: 'โปรเจกต์ส่วนตัว',
     company: 'โปรเจกต์ของบริษัท',
   },
+  project_name: {
+    label: 'ชื่อโปรเจกต์',
+    placeholder: 'โปรเจกต์ของฉัน',
+  },
   company_name: {
     label: 'ชื่อบริษัท',
     placeholder: 'Acme.co',
@@ -24,8 +28,7 @@ const oss_onboarding = {
   errors: {
     email_required: 'จำเป็นต้องกรอกอีเมล',
     email_invalid: 'กรุณากรอกอีเมลที่ถูกต้อง',
-    company_name_required: 'จำเป็นต้องกรอกชื่อบริษัท',
-    company_size_required: 'จำเป็นต้องเลือกขนาดบริษัท',
+    project_name_too_long: 'ชื่อโปรเจกต์ต้องมีไม่เกิน 200 ตัวอักษร',
   },
 };
 

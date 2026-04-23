@@ -13,6 +13,10 @@ const oss_onboarding = {
     personal: 'مشروع شخصي',
     company: 'مشروع شركة',
   },
+  project_name: {
+    label: 'اسم المشروع',
+    placeholder: 'مشروعي',
+  },
   company_name: {
     label: 'اسم الشركة',
     placeholder: 'Acme.co',
@@ -23,8 +27,7 @@ const oss_onboarding = {
   errors: {
     email_required: 'البريد الإلكتروني مطلوب',
     email_invalid: 'أدخل بريدًا إلكترونيًا صالحًا',
-    company_name_required: 'اسم الشركة مطلوب',
-    company_size_required: 'حجم الشركة مطلوب',
+    project_name_too_long: 'يجب ألا يتجاوز اسم المشروع 200 حرف',
   },
 };
 

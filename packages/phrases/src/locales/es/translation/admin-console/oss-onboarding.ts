@@ -15,6 +15,10 @@ const oss_onboarding = {
     personal: 'Proyecto personal',
     company: 'Proyecto de empresa',
   },
+  project_name: {
+    label: 'Nombre del proyecto',
+    placeholder: 'Mi proyecto',
+  },
   company_name: {
     label: 'Nombre de la empresa',
     placeholder: 'Acme.co',
@@ -25,8 +29,7 @@ const oss_onboarding = {
   errors: {
     email_required: 'El correo electrónico es obligatorio',
     email_invalid: 'Introduce un correo electrónico válido',
-    company_name_required: 'El nombre de la empresa es obligatorio',
-    company_size_required: 'El tamaño de la empresa es obligatorio',
+    project_name_too_long: 'El nombre del proyecto debe tener como maximo 200 caracteres',
   },
 };
 
