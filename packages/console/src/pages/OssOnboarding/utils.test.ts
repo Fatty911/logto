@@ -10,14 +10,13 @@ import {
 } from './utils';
 
 describe('OSS onboarding form utils', () => {
-  test('uses company project as the default selection and leaves email blank', () => {
+  test('uses company project as the default selection with no company size preselected', () => {
     expect(getOssOnboardingDefaultValues()).toEqual({
       emailAddress: '',
       newsletter: false,
       project: Project.Company,
       projectName: '',
       companyName: '',
-      companySize: CompanySize.Scale3,
     });
   });
 
@@ -30,10 +29,12 @@ describe('OSS onboarding form utils', () => {
     expect(normalizeOssOnboardingEmailAddress(' Dev@Example.COM ')).toBe('dev@example.com');
     expect(normalizeOssOnboardingEmailAddress('not-an-email')).toBeUndefined();
     expect(normalizeOssOnboardingEmailAddress('')).toBeUndefined();
+    expect(normalizeOssOnboardingEmailAddress()).toBeUndefined();
 
     expect(isValidOssOnboardingEmailAddress('Dev@Example.COM')).toBe(true);
     expect(isValidOssOnboardingEmailAddress('not-an-email')).toBe(false);
     expect(isValidOssOnboardingEmailAddress('')).toBe(false);
+    expect(isValidOssOnboardingEmailAddress()).toBe(false);
   });
 
   test('drops company-only values from the questionnaire payload for personal projects', () => {
