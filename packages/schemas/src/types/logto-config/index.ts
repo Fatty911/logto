@@ -4,6 +4,12 @@ import type { ZodType } from 'zod';
 import { z } from 'zod';
 
 import {
+  type MessageRateLimitOverride,
+  messageRateLimitOverrideGuard,
+} from '../../consts/message-rate-limit.js';
+
+import { type InlineHook, LogtoInlineHookKey, inlineHookGuard } from './inline-hook.js';
+import {
   type AccessTokenJwtCustomizer,
   type ClientCredentialsJwtCustomizer,
   accessTokenJwtCustomizerGuard,
@@ -12,6 +18,7 @@ import {
 
 export * from './oidc-provider.js';
 export * from './jwt-customizer.js';
+export * from './inline-hook.js';
 
 /**
  * Logto OIDC signing key types, used mainly in REST API routes.
@@ -98,6 +105,18 @@ export const jwtCustomizerConfigGuard: Readonly<{
   [LogtoJwtTokenKey.ClientCredentials]: clientCredentialsJwtCustomizerGuard,
 });
 
+export type InlineHookType = {
+  [LogtoInlineHookKey.PostFirstFactorVerification]: InlineHook;
+  [LogtoInlineHookKey.PostSignIn]: InlineHook;
+};
+
+export const inlineHookConfigGuard: Readonly<{
+  [key in LogtoInlineHookKey]: ZodType<InlineHookType[key]>;
+}> = Object.freeze({
+  [LogtoInlineHookKey.PostFirstFactorVerification]: inlineHookGuard,
+  [LogtoInlineHookKey.PostSignIn]: inlineHookGuard,
+});
+
 export const jwtCustomizerConfigsGuard = z.discriminatedUnion('key', [
   z.object({
     key: z.literal(LogtoJwtTokenKey.AccessToken),
@@ -171,6 +190,8 @@ export enum LogtoTenantConfigKey {
   IdToken = 'idToken',
   /** Tenant-scoped rotation state for staged private signing key activation. */
   SigningKeyRotationState = 'signingKeyRotationState',
+  /** Internal, ops-only override of the system message send-rate-limit policy. Not exposed by any API. */
+  MessageRateLimitOverride = 'messageRateLimitOverride',
 }
 export type LogtoTenantConfigType = {
   [LogtoTenantConfigKey.AdminConsole]: AdminConsoleData;
@@ -178,6 +199,7 @@ export type LogtoTenantConfigType = {
   [LogtoTenantConfigKey.SessionNotFoundRedirectUrl]: { url: string };
   [LogtoTenantConfigKey.IdToken]: IdTokenConfig;
   [LogtoTenantConfigKey.SigningKeyRotationState]: SigningKeyRotationState;
+  [LogtoTenantConfigKey.MessageRateLimitOverride]: MessageRateLimitOverride;
 };
 
 export const logtoTenantConfigGuard: Readonly<{
@@ -188,24 +210,36 @@ export const logtoTenantConfigGuard: Readonly<{
   [LogtoTenantConfigKey.SessionNotFoundRedirectUrl]: z.object({ url: z.string() }),
   [LogtoTenantConfigKey.IdToken]: idTokenConfigGuard,
   [LogtoTenantConfigKey.SigningKeyRotationState]: signingKeyRotationStateGuard,
+  [LogtoTenantConfigKey.MessageRateLimitOverride]: messageRateLimitOverrideGuard,
 });
 
 /* --- Summary --- */
-export type LogtoConfigKey = LogtoOidcConfigKey | LogtoJwtTokenKey | LogtoTenantConfigKey;
-export type LogtoConfigType = LogtoOidcConfigType | JwtCustomizerType | LogtoTenantConfigType;
+export type LogtoConfigKey =
+  | LogtoOidcConfigKey
+  | LogtoJwtTokenKey
+  | LogtoInlineHookKey
+  | LogtoTenantConfigKey;
+export type LogtoConfigType =
+  | LogtoOidcConfigType
+  | JwtCustomizerType
+  | InlineHookType
+  | LogtoTenantConfigType;
 export type LogtoConfigGuard = typeof logtoOidcConfigGuard &
   typeof jwtCustomizerConfigGuard &
+  typeof inlineHookConfigGuard &
   typeof logtoTenantConfigGuard;
 
 export const logtoConfigKeys: readonly LogtoConfigKey[] = Object.freeze([
   ...Object.values(LogtoOidcConfigKey),
   ...Object.values(LogtoJwtTokenKey),
+  ...Object.values(LogtoInlineHookKey),
   ...Object.values(LogtoTenantConfigKey),
 ]);
 
 export const logtoConfigGuards: LogtoConfigGuard = Object.freeze({
   ...logtoOidcConfigGuard,
   ...jwtCustomizerConfigGuard,
+  ...inlineHookConfigGuard,
   ...logtoTenantConfigGuard,
 });
 
@@ -213,6 +247,7 @@ export const oidcConfigKeysResponseGuard = oidcConfigKeyGuard.omit({ value: true
   z.object({
     signingKeyAlgorithm: z.nativeEnum(SupportedSigningKeyAlgorithm).optional(),
     status: z.nativeEnum(OidcSigningKeyStatus).optional(),
+    effectiveAt: z.number().optional(),
   })
 );
 

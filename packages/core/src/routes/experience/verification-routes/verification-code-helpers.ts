@@ -11,6 +11,7 @@ import { Action } from '@logto/schemas/lib/types/log/interaction.js';
 import RequestError from '#src/errors/RequestError/index.js';
 import { type PasscodeLibrary } from '#src/libraries/passcode.js';
 import { type LogContext } from '#src/middleware/koa-audit-log.js';
+import { buildMessageRateGuard, withMessageRateGuard } from '#src/sentinel/message-rate-guard.js';
 import type Libraries from '#src/tenants/Libraries.js';
 import type Queries from '#src/tenants/Queries.js';
 import { getLogtoCookie } from '#src/utils/cookie.js';
@@ -73,11 +74,7 @@ type SendCodeParams = {
   ctx: ExperienceInteractionRouterContext;
 };
 
-/**
- * Check if a user exists with the given identifier (email or phone).
- * Used to determine whether to actually deliver verification codes
- * in the forgot-password flow, preventing account enumeration and spam.
- */
+/** Whether a user exists with the given identifier (email or phone). */
 const hasUserWithIdentifier = async (
   queries: Queries,
   identifier: VerificationCodeIdentifier
@@ -89,6 +86,35 @@ const hasUserWithIdentifier = async (
   }
 
   return queries.users.hasUserWithNormalizedPhone(value);
+};
+
+/**
+ * Whether to create the passcode record but suppress delivery, for a recipient with no legitimate
+ * reason to receive a code (anti-enumeration / anti-spam). The record is still created, so a later
+ * verify returns `code_mismatch`, not `not_found`. Two cases:
+ *
+ * - Forgot-password to an identifier no user owns (always on).
+ * - Sign-in from an unidentified session to an identifier no user owns when registration is
+ *   disabled; identified sessions always deliver.
+ */
+const shouldSkipDelivery = async (
+  experienceInteraction: ExperienceInteraction,
+  queries: Queries,
+  identifier: VerificationCodeIdentifier,
+  interactionEvent?: InteractionEvent
+): Promise<boolean> => {
+  if (interactionEvent === InteractionEvent.ForgotPassword) {
+    return !(await hasUserWithIdentifier(queries, identifier));
+  }
+
+  if (interactionEvent === InteractionEvent.SignIn && !experienceInteraction.identifiedUserId) {
+    const registrationDisabled =
+      await experienceInteraction.signInExperienceValidator.isRegistrationDisabled();
+
+    return registrationDisabled && !(await hasUserWithIdentifier(queries, identifier));
+  }
+
+  return false;
 };
 
 /**
@@ -124,29 +150,43 @@ export const sendCode = async ({
     await experienceInteraction.signInExperienceValidator.guardEmailBlocklist(codeVerification);
   }
 
-  // For forgot-password requests, unknown identifiers still create the passcode record
-  // (so verification returns `code_mismatch` instead of `not_found`) and keep
-  // connector/template validation, but avoid the actual message delivery.
-  const validateOnly =
-    interactionEvent === InteractionEvent.ForgotPassword &&
-    !(await hasUserWithIdentifier(queries, identifier));
-
-  // Build template context
-  const templateContext = await buildVerificationCodeTemplateContext(
-    libraries.passcodes,
-    ctx,
-    identifier
+  const skipDelivery = await shouldSkipDelivery(
+    experienceInteraction,
+    queries,
+    identifier,
+    interactionEvent
   );
 
-  // Send verification code
-  await codeVerification.sendVerificationCode(
+  const payload = skipDelivery
+    ? undefined
+    : {
+        ...ctx.emailI18n,
+        ...(await buildVerificationCodeTemplateContext(libraries.passcodes, ctx, identifier)),
+        /** The client IP address for rate limiting and fraud detection. */
+        ...(ctx.request.ip && { ip: ctx.request.ip }),
+      };
+
+  // Send verification code. When delivery is skipped (see `shouldSkipDelivery`) the passcode record is
+  // still created but nothing is sent.
+  const send = async () => codeVerification.sendVerificationCode(payload, { skipDelivery });
+
+  const messageRateLimit = {
+    action: SentinelActivityAction.VerificationCodeSend,
+    recipient: identifier.value,
+  };
+
+  // The rate guard runs even for suppressed sends: a suppressed send must still count toward the
+  // per-recipient cap, otherwise an unknown recipient never hits 429 while a registered one does —
+  // leaking registration status (account enumeration) and defeating the point of suppression.
+  await withMessageRateGuard(
+    await buildMessageRateGuard(queries),
     {
-      ...ctx.emailI18n,
-      ...templateContext,
-      /** The client IP address for rate limiting and fraud detection. */
-      ...(ctx.request.ip && { ip: ctx.request.ip }),
+      ...messageRateLimit,
+      onRateLimited: () => {
+        ctx.appendExceptionHookContext('Message.RateLimited', messageRateLimit);
+      },
     },
-    { validateOnly }
+    send
   );
 
   // Save state

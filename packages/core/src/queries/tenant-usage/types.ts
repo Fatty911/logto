@@ -42,6 +42,9 @@ export type QuotaUsageKey = Exclude<
   | 'tokenLimit'
   // Exclude tenantMembersLimit as it is checked in Cloud, not in core.
   | 'tenantMembersLimit'
+  // Exclude the hosted-email caps as they are enforced at the Cloud `/mails` guard, not in core.
+  | 'hostedEmailLimit'
+  | 'hostedEmailDailyLimit'
 >;
 
 /**
@@ -86,6 +89,7 @@ export const isSystemUsageKey = (key: UsageKey): key is SystemUsageKey =>
 const quotaUsageKeyGuard = z.enum([
   ...sharedUsageKeyGuard.options,
   'customJwtEnabled',
+  'inlineHooksEnabled',
   'subjectTokenEnabled',
   'bringYourUiEnabled',
   'collectUserProfileEnabled',
@@ -132,6 +136,7 @@ type BooleanQuotaUsageKey = {
 
 const booleanQuotaUsageKeyGuard = z.enum([
   'customJwtEnabled',
+  'inlineHooksEnabled',
   'subjectTokenEnabled',
   'bringYourUiEnabled',
   'collectUserProfileEnabled',

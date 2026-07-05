@@ -1,4 +1,4 @@
-import { emailOrEmailDomainRegEx } from '@logto/core-kit';
+import { isEmailBlocklistItem, matchesEmailBlocklistItem } from '@logto/core-kit';
 import { type EmailBlocklistPolicy } from '@logto/schemas';
 import { conditional, deduplicate } from '@silverhand/essentials';
 import { got } from 'got';
@@ -8,11 +8,11 @@ import { EnvSet } from '#src/env-set/index.js';
 import RequestError from '#src/errors/RequestError/index.js';
 import assertThat from '#src/utils/assert-that.js';
 
-const validateCustomBlockListFormat = (list: string[]) => {
-  const invalidItems = new Set();
+const validateCustomBlockListFormat = (list: string[], allowWildcard: boolean) => {
+  const invalidItems = new Set<string>();
 
   for (const item of list) {
-    if (!emailOrEmailDomainRegEx.test(item)) {
+    if (!isEmailBlocklistItem(item, { allowWildcard })) {
       invalidItems.add(item);
     }
   }
@@ -22,7 +22,10 @@ const validateCustomBlockListFormat = (list: string[]) => {
 
 const parseCustomBlocklist = (customBlocklist: string[]) => {
   const deduplicated = deduplicate(customBlocklist);
-  const invalidItems = validateCustomBlockListFormat(deduplicated);
+  const invalidItems = validateCustomBlockListFormat(
+    deduplicated,
+    EnvSet.values.isDevFeaturesEnabled
+  );
 
   if (invalidItems.size > 0) {
     throw new RequestError({
@@ -138,9 +141,12 @@ export const validateEmailAgainstBlocklistPolicy = async (
 
   // Guard email subaddressing if enabled
   if (blockSubaddressing) {
-    const subaddressingRegex = new RegExp(`^.*\\+.*@${domain}$`);
+    // Subaddressing puts a `+` in the local part (e.g. `user+tag@example.com`). Check the local
+    // part directly instead of building a `RegExp` from the user-controlled domain — a plain
+    // string check is simpler and avoids interpreting user input as a pattern.
+    const localPart = email.split('@')[0] ?? '';
     assertThat(
-      !subaddressingRegex.test(email),
+      !localPart.includes('+'),
       new RequestError({
         code: 'session.email_blocklist.email_subaddressing_not_allowed',
         status: 422,
@@ -150,14 +156,9 @@ export const validateEmailAgainstBlocklistPolicy = async (
 
   // Guard custom email address/domain if provided
   if (customBlocklist) {
-    const isCustomBlocklisted = customBlocklist.some((item) => {
-      // Guard email domain
-      if (item.startsWith('@')) {
-        return domain === item.slice(1);
-      }
-
-      return email === item;
-    });
+    const isCustomBlocklisted = customBlocklist.some((item) =>
+      matchesEmailBlocklistItem(item, email)
+    );
 
     assertThat(
       !isCustomBlocklisted,

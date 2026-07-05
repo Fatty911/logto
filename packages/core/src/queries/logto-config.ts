@@ -1,4 +1,5 @@
 import {
+  type inlineHookConfigGuard,
   type jwtCustomizerConfigGuard,
   LogtoConfigs,
   LogtoTenantConfigKey,
@@ -6,6 +7,7 @@ import {
   type IdTokenConfig,
   type LogtoConfig,
   type LogtoConfigKey,
+  type LogtoInlineHookKey,
   LogtoOidcConfigKey,
   type LogtoJwtTokenKey,
   type OidcPrivateKey,
@@ -14,6 +16,7 @@ import {
   type LogtoOidcConfigType,
   signingKeyRotationStateGuard,
   type SigningKeyRotationState,
+  messageRateLimitOverrideGuard,
 } from '@logto/schemas';
 import type { CommonQueryMethods } from '@silverhand/slonik';
 import { sql } from '@silverhand/slonik';
@@ -217,6 +220,23 @@ export const createLogtoConfigQueries = (
 
   const deleteJwtCustomizer = async <T extends LogtoJwtTokenKey>(key: T) => deleteRowByKey(key);
 
+  const upsertInlineHook = async <T extends LogtoInlineHookKey>(
+    key: T,
+    value: z.infer<(typeof inlineHookConfigGuard)[T]>
+  ) =>
+    pool.one<{ key: T; value: z.infer<(typeof inlineHookConfigGuard)[T]> }>(
+      sql`
+        insert into ${table} (${fields.key}, ${fields.value})
+          values (${key}, ${sql.jsonb(value)})
+          on conflict (${fields.tenantId}, ${fields.key}) do update set ${
+            fields.value
+          } = ${sql.jsonb(value)}
+          returning *
+      `
+    );
+
+  const deleteInlineHook = async <T extends LogtoInlineHookKey>(key: T) => deleteRowByKey(key);
+
   const getIdTokenConfig = wellKnownCache.memoize(async () => {
     const { rows } = await getRowsByKeys([LogtoTenantConfigKey.IdToken]);
 
@@ -238,6 +258,19 @@ export const createLogtoConfigQueries = (
     ['id-token-config']
   );
 
+  // Internal, ops-only per-tenant override of the system message send-rate-limit policy. There is
+  // intentionally no upsert counterpart: the key is set by direct DB write only (no API), so the
+  // cache picks it up on its next expiry (or tenant restart).
+  const getMessageRateLimitOverride = wellKnownCache.memoize(async () => {
+    const { rows } = await getRowsByKeys([LogtoTenantConfigKey.MessageRateLimitOverride]);
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return messageRateLimitOverrideGuard.parse(rows[0]?.value);
+  }, ['message-rate-limit-override']);
+
   return {
     getAdminConsoleConfig,
     updateAdminConsoleConfig,
@@ -254,7 +287,10 @@ export const createLogtoConfigQueries = (
     setSigningKeyRotationAt,
     upsertJwtCustomizer,
     deleteJwtCustomizer,
+    upsertInlineHook,
+    deleteInlineHook,
     getIdTokenConfig,
     upsertIdTokenConfig,
+    getMessageRateLimitOverride,
   };
 };
