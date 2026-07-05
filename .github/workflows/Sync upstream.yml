@@ -2,7 +2,7 @@ name: Sync upstream
 
 on:
   schedule:
-    - cron: '*/10 0 * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -17,8 +17,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Configure Git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
       - name: Add upstream remote
-        run: git remote add upstream https://github.com/logto-io/logto.git
+        run: git remote add upstream https://github.com/logto-io/logto.git || true
 
       - name: Fetch upstream
         run: git fetch upstream
@@ -38,7 +43,7 @@ jobs:
           done
           
           if [ -z "$upstream_branch" ] || [ -z "$local_branch" ]; then
-            echo "Error: Could not find valid branch combination (tried main/master for both upstream and local)" >&2
+            echo "Error: Could not find valid branch combination" >&2
             exit 1
           fi
           
@@ -52,7 +57,19 @@ jobs:
       - name: Merge upstream
         if: steps.check.outputs.need_sync == 'true'
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git merge upstream/${{ steps.check.outputs.upstream_branch }} --no-edit
-          git push origin ${{ steps.check.outputs.local_branch }}
+          LOCAL_BRANCH=${{ steps.check.outputs.local_branch }}
+          UPSTREAM_BRANCH=${{ steps.check.outputs.upstream_branch }}
+          
+          git merge "upstream/$UPSTREAM_BRANCH" --no-edit --no-commit || true
+          # GITHUB_TOKEN 无法 push workflow 文件变更，保留本地版本
+          git checkout HEAD -- .github/workflows/ || true
+          git commit -m "chore: sync upstream (preserve local workflows) [auto-sync]" || true
+          
+          # 尝试 push，如果失败则排除 workflow 文件后重试
+          if ! git push origin "$LOCAL_BRANCH" 2>/dev/null; then
+            echo "Push failed, retrying without workflow changes..."
+            git checkout HEAD -- .github/workflows/ || true
+            git commit --amend --no-edit --allow-empty || true
+            git push origin "$LOCAL_BRANCH"
+          fi
+          echo "Sync completed"
