@@ -1,9 +1,12 @@
+import { appInsights } from '@logto/app-insights/node';
 import { LogtoInlineHookKey } from '@logto/schemas';
 import { ResponseError } from '@withtyped/client';
 import nock from 'nock';
 
 import { EnvSet } from '#src/env-set/index.js';
+import { createMockLogContext } from '#src/test-utils/koa-audit-log.js';
 
+import { inlineHookMetricNames } from './inline-hook-telemetry.js';
 import { InlineHookLibrary } from './inline-hook.js';
 import type { LogtoConfigLibrary } from './logto-config.js';
 import type { SubscriptionLibrary } from './subscription.js';
@@ -14,6 +17,8 @@ const getInlineHook = jest.fn() as jest.MockedFunction<LogtoConfigLibrary['getIn
 const getSubscriptionData = jest.fn() as jest.MockedFunction<
   SubscriptionLibrary['getSubscriptionData']
 >;
+const trackMetric = jest.fn();
+const originalAppInsightsClient = appInsights.client;
 
 const createLibrary = (tenantId = 'tenant_id') =>
   new InlineHookLibrary(
@@ -30,10 +35,22 @@ const setIsCloud = (isCloud: boolean) => {
   (EnvSet.values as { isCloud: boolean }).isCloud = isCloud;
 };
 
+type RunHookInput<Event> = {
+  key: LogtoInlineHookKey;
+} & ({ event: Event } | { getEvent: () => Promise<Event> });
+
 describe('InlineHookLibrary Cloud execution routing', () => {
   const library = createLibrary();
+  const { createLog, mockAppend } = createMockLogContext();
+  const runHook = async <Event>(input: RunHookInput<Event>) =>
+    library.runHook({ ...input, auditContext: { createLog } });
 
   beforeEach(() => {
+    // eslint-disable-next-line @silverhand/fp/no-mutation -- Provide an AppInsights client for metric assertions.
+    appInsights.client = {
+      trackMetric,
+      trackException: jest.fn(),
+    } as unknown as NonNullable<typeof appInsights.client>;
     // eslint-disable-next-line @silverhand/fp/no-mutation -- Toggle EnvSet for inline hook runtime tests.
     (EnvSet.values as { isDevFeaturesEnabled: boolean }).isDevFeaturesEnabled = true;
     getSubscriptionData.mockResolvedValue({
@@ -47,6 +64,8 @@ describe('InlineHookLibrary Cloud execution routing', () => {
     nock.cleanAll();
     jest.restoreAllMocks();
     jest.clearAllMocks();
+    // eslint-disable-next-line @silverhand/fp/no-mutation -- Restore the shared AppInsights singleton.
+    appInsights.client = originalAppInsightsClient;
     setIsCloud(originalIsCloud);
     // eslint-disable-next-line @silverhand/fp/no-mutation -- Restore EnvSet after dev feature tests.
     (EnvSet.values as { isDevFeaturesEnabled: boolean }).isDevFeaturesEnabled =
@@ -181,13 +200,35 @@ describe('InlineHookLibrary Cloud execution routing', () => {
     const runScriptInLocalVm = jest.spyOn(InlineHookLibrary, 'runScriptInLocalVm');
 
     await expect(
-      library.runHook({
+      runHook({
         key: LogtoInlineHookKey.PostSignIn,
         event,
       })
     ).resolves.toEqual(executionResult);
     expect(remoteRunner.isDone()).toBe(true);
     expect(runScriptInLocalVm).not.toHaveBeenCalled();
+    expect(mockAppend).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ runtimeLocation: 'remote' })
+    );
+    const metricProperties = {
+      hookType: 'PostSignIn',
+      runtimeLocation: 'azure',
+      outcome: 'success',
+      action: 'updateUser',
+    };
+    expect(trackMetric).toHaveBeenCalledTimes(2);
+    expect(trackMetric).toHaveBeenNthCalledWith(1, {
+      name: inlineHookMetricNames.executionCount,
+      value: 1,
+      properties: metricProperties,
+    });
+    expect(trackMetric).toHaveBeenNthCalledWith(2, {
+      name: inlineHookMetricNames.executionDuration,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Jest asymmetric matcher is typed as `any`.
+      value: expect.any(Number),
+      properties: metricProperties,
+    });
   });
 
   it('applies allow-mode policy when Cloud remote execution fails without local fallback', async () => {
@@ -214,7 +255,7 @@ describe('InlineHookLibrary Cloud execution routing', () => {
     const runScriptInLocalVm = jest.spyOn(InlineHookLibrary, 'runScriptInLocalVm');
 
     await expect(
-      library.runHook({
+      runHook({
         key: LogtoInlineHookKey.PostSignIn,
         event: {},
       })
@@ -240,7 +281,7 @@ describe('InlineHookLibrary Cloud execution routing', () => {
     const runScriptInLocalVm = jest.spyOn(InlineHookLibrary, 'runScriptInLocalVm');
 
     await expect(
-      library.runHook({
+      runHook({
         key: LogtoInlineHookKey.PostSignIn,
         event: {},
       })
@@ -264,7 +305,7 @@ describe('InlineHookLibrary Cloud execution routing', () => {
     const runScriptInLocalVm = jest.spyOn(InlineHookLibrary, 'runScriptInLocalVm');
 
     await expect(
-      library.runHook({
+      runHook({
         key: LogtoInlineHookKey.PostFirstFactorVerification,
         event: {
           password: 'secret-password',
