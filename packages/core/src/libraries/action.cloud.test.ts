@@ -55,7 +55,7 @@ describe('ActionLibrary Cloud execution routing', () => {
     (EnvSet.values as { isDevFeaturesEnabled: boolean }).isDevFeaturesEnabled = true;
     getSubscriptionData.mockResolvedValue({
       quota: {
-        inlineHooksEnabled: true,
+        actionsEnabled: true,
       },
     } as Awaited<ReturnType<SubscriptionLibrary['getSubscriptionData']>>);
   });
@@ -104,13 +104,13 @@ describe('ActionLibrary Cloud execution routing', () => {
       },
     };
     const executionResult = { action: 'continue' };
-    const matchLegacyRunnerPayload = jest.fn((_body: unknown) => true);
+    const matchRunnerPayload = jest.fn((_body: unknown) => true);
     const remoteRunner = nock(endpoint, {
       reqheaders: {
         'x-functions-key': functionKey,
       },
     })
-      .post('/api/inline-hooks', matchLegacyRunnerPayload)
+      .post('/api/actions', matchRunnerPayload)
       .reply(200, executionResult);
 
     jest.spyOn(EnvSet.values, 'azureFunctionUntrustedAppEndpoint', 'get').mockReturnValue(endpoint);
@@ -118,9 +118,9 @@ describe('ActionLibrary Cloud execution routing', () => {
 
     await expect(library.runScriptRemotely(payload)).resolves.toEqual(executionResult);
     expect(remoteRunner.isDone()).toBe(true);
-    const requestBody = matchLegacyRunnerPayload.mock.calls[0]?.[0];
+    const requestBody = matchRunnerPayload.mock.calls[0]?.[0];
     expect(requestBody).toMatchObject({
-      hookType: payload.actionType,
+      actionType: payload.actionType,
       event: payload.event,
     });
     if (
@@ -129,10 +129,9 @@ describe('ActionLibrary Cloud execution routing', () => {
       !('script' in requestBody) ||
       typeof requestBody.script !== 'string'
     ) {
-      throw new TypeError('Expected the legacy runner request body to contain a script');
+      throw new TypeError('Expected the runner request body to contain a script');
     }
-    expect(requestBody.script).toContain(payload.script);
-    expect(requestBody.script).toContain('runInlineHook');
+    expect(requestBody.script).toBe(payload.script);
   });
 
   it('uses the remote runner for Cloud executeScript without falling back to local VM', async () => {
@@ -193,13 +192,13 @@ describe('ActionLibrary Cloud execution routing', () => {
         name: 'Bar',
       },
     };
-    const matchLegacyRunnerPayload = jest.fn((_body: unknown) => true);
+    const matchRunnerPayload = jest.fn((_body: unknown) => true);
     const remoteRunner = nock(endpoint, {
       reqheaders: {
         'x-functions-key': functionKey,
       },
     })
-      .post('/api/inline-hooks', matchLegacyRunnerPayload)
+      .post('/api/actions', matchRunnerPayload)
       .reply(200, executionResult);
 
     jest.spyOn(EnvSet.values, 'azureFunctionUntrustedAppEndpoint', 'get').mockReturnValue(endpoint);
@@ -218,9 +217,9 @@ describe('ActionLibrary Cloud execution routing', () => {
       })
     ).resolves.toEqual(executionResult);
     expect(remoteRunner.isDone()).toBe(true);
-    const requestBody = matchLegacyRunnerPayload.mock.calls[0]?.[0];
+    const requestBody = matchRunnerPayload.mock.calls[0]?.[0];
     expect(requestBody).toMatchObject({
-      hookType: LogtoActionKey.PostSignIn,
+      actionType: LogtoActionKey.PostSignIn,
       event,
       environmentVariables,
     });
@@ -230,9 +229,9 @@ describe('ActionLibrary Cloud execution routing', () => {
       !('script' in requestBody) ||
       typeof requestBody.script !== 'string'
     ) {
-      throw new TypeError('Expected the legacy runner request body to contain a script');
+      throw new TypeError('Expected the runner request body to contain a script');
     }
-    expect(requestBody.script).toContain(script);
+    expect(requestBody.script).toBe(script);
     expect(runScriptInLocalVm).not.toHaveBeenCalled();
     expect(mockAppend).toHaveBeenNthCalledWith(
       1,
@@ -267,7 +266,7 @@ describe('ActionLibrary Cloud execution routing', () => {
         'x-functions-key': functionKey,
       },
     })
-      .post('/api/inline-hooks')
+      .post('/api/actions')
       .reply(500, {
         message: 'Remote runner failed',
       });

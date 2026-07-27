@@ -16,10 +16,6 @@ import RequestError from '#src/errors/RequestError/index.js';
 import type { LogtoConfigLibrary } from '#src/libraries/logto-config.js';
 import type { SubscriptionLibrary } from '#src/libraries/subscription.js';
 import type { LogContext, LogPayload } from '#src/middleware/koa-audit-log.js';
-import {
-  legacyActionFunctionName,
-  wrapActionScriptForLegacyRunner,
-} from '#src/utils/action-script-compatibility.js';
 import { parseAzureFunctionsResponseError } from '#src/utils/custom-jwt/index.js';
 import {
   buildLocalVmErrorBody,
@@ -28,11 +24,11 @@ import {
 } from '#src/utils/local-vm/index.js';
 
 import {
+  buildActionTelemetryError,
   buildSafeActionErrorSummary,
-  buildSafeActionTelemetryError,
-  getActionSensitiveValues,
-  sanitizeActionEvent,
-  sanitizeActionResult,
+  getActionEventCredentials,
+  toLoggableActionEvent,
+  toLoggableActionResult,
 } from './action-sanitization.js';
 import {
   getActionExecutionErrorTelemetryProperties,
@@ -41,6 +37,7 @@ import {
   trackActionExecutionMetrics,
 } from './action-telemetry.js';
 
+const actionFunctionName = 'runAction';
 const defaultActionExecutionErrorPolicy = 'block' satisfies ActionExecutionErrorPolicy;
 /**
  * Azure Function vm2 timeout is 3000ms. Use a slightly higher HTTP deadline so the
@@ -207,11 +204,7 @@ export class ActionLibrary {
         environmentVariables,
       };
 
-      return await runScriptFunctionInLocalVm(
-        wrapActionScriptForLegacyRunner(script),
-        legacyActionFunctionName,
-        payload
-      );
+      return await runScriptFunctionInLocalVm(script, actionFunctionName, payload);
     } catch (error: unknown) {
       if (error instanceof LocalVmError) {
         throw error;
@@ -298,11 +291,11 @@ export class ActionLibrary {
 
     try {
       return await got
-        // Keep the legacy endpoint and payload field until the external Azure runner migrates.
-        .post(new URL('/api/inline-hooks', azureFunctionUntrustedAppEndpoint), {
+        // The remote runner must invoke `runAction` from the supplied script.
+        .post(new URL('/api/actions', azureFunctionUntrustedAppEndpoint), {
           json: {
-            script: wrapActionScriptForLegacyRunner(script),
-            hookType: actionType,
+            script,
+            actionType,
             event,
             environmentVariables,
           },
@@ -350,7 +343,6 @@ export class ActionLibrary {
       event: event as ActionExecutionRequestBody['event'],
       environmentVariables: action.environmentVariables,
     };
-    const sensitiveValues = getActionSensitiveValues(executionPayload);
     const onExecutionError = action.onExecutionError ?? defaultActionExecutionErrorPolicy;
     const runtimeLocation = EnvSet.values.isCloud ? 'remote' : 'local';
     const telemetryRuntimeLocation: ActionRuntimeLocation = EnvSet.values.isCloud
@@ -364,7 +356,7 @@ export class ActionLibrary {
       actionType: key,
       runtimeLocation,
       onExecutionError,
-      event: sanitizeActionEvent(event, sensitiveValues),
+      event: toLoggableActionEvent(key, event),
     });
 
     const startedAt = Date.now();
@@ -396,10 +388,12 @@ export class ActionLibrary {
           durationMs,
           decision: decision.action,
           errorPolicyOutcome: decision.action === 'continue' ? 'allow' : 'block',
-          actionError: buildSafeActionErrorSummary(error, sensitiveValues),
+          actionError: buildSafeActionErrorSummary(error, {
+            redactValues: getActionEventCredentials(event),
+          }),
         });
 
-        void appInsights.trackException(buildSafeActionTelemetryError(error, sensitiveValues), {
+        void appInsights.trackException(buildActionTelemetryError(error), {
           properties: telemetryProperties,
         });
 
@@ -412,7 +406,7 @@ export class ActionLibrary {
       log.append({
         durationMs,
         ...actionSummary,
-        actionResult: sanitizeActionResult(result, sensitiveValues),
+        actionResult: toLoggableActionResult(result),
       });
 
       return result;
@@ -425,7 +419,6 @@ export class ActionLibrary {
     try {
       const action = await this.logtoConfigs.getAction(key);
 
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Preserve the legacy no-config fallback for isolated library implementations.
       if (!action?.enabled) {
         return;
       }
@@ -453,8 +446,7 @@ export class ActionLibrary {
 
     const { quota } = await this.subscription.getSubscriptionData();
 
-    // Keep the legacy key because it is part of the Logto Cloud subscription wire contract.
-    return quota.inlineHooksEnabled;
+    return quota.actionsEnabled;
   }
 }
 /* eslint-enable max-lines */
