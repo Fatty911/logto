@@ -1,29 +1,16 @@
 /**
- * @overview Wildcard redirect URI matching for OIDC clients.
- *
- * The v8 fork of oidc-provider carried this logic inside `Client.prototype.redirectUriAllowed` /
- * `postLogoutRedirectUriAllowed` (fork patch logto-io/node-oidc-provider#18). The v9 fork
- * deliberately drops that patch (see the fork's PATCHES.md), so the matching moves here and is
- * installed onto the per-tenant `provider.Client` prototype right after the provider is created.
- *
- * Matching semantics are unchanged from the fork:
- *
- * - `*` is supported in the hostname and pathname only — never in scheme, port, query, or hash.
- * - A hostname wildcard requires at least one dot, and the last two labels must be literal, so
- *   overly broad patterns such as `*.com` or `example.*` never match anything.
- * - A candidate value containing `*` is always rejected, so a wildcard pattern itself can never
- *   serve as a concrete redirect target. This also covers the fork's `one_redirect_uri_clients`
- *   guard: when the provider defaults a sole registered wildcard URI as the `redirect_uri`
- *   parameter, the match fails and the authorization request is rejected.
+ * @overview Shared primitives for redirect URI matching: URL parsing, loopback knowledge, and
+ * the Logto wildcard pattern subsystem. Kept free of matching policy so both the registered
+ * application matchers (`./index.js`) and the CIMD matchers (`../cimd/redirect-uri.js`) can
+ * build on them without an import cycle.
  */
 
 import { trySafe } from '@silverhand/essentials';
-import { type Provider } from 'oidc-provider';
 
 /** @see {@link https://github.com/logto-io/node-oidc-provider/blob/v9/lib/consts/client_attributes.js | Upstream `LOOPBACKS`} */
-const loopbackHostnames = new Set(['localhost', '127.0.0.1', '[::1]']);
+export const loopbackHostnames = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-const parseUrl = (value: string) => trySafe(() => new URL(value));
+export const parseUrl = (value: string) => trySafe(() => new URL(value));
 
 const escapeRegExp = (value: string) => value.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`);
 
@@ -203,70 +190,11 @@ export const wildcardUrlMatch = (pattern: string, actual: URL): boolean => {
   return actual.search === parsedPattern.search && actual.hash === parsedPattern.hash;
 };
 
-const matchAgainstRegistered = (registeredUris: readonly string[], parsed: URL) =>
-  registeredUris.some((allowed) =>
-    allowed.includes('*')
-      ? wildcardUrlMatch(allowed, parsed)
-      : parseUrl(allowed)?.href === parsed.href
-  );
-
 /**
- * Override `redirectUriAllowed` and `postLogoutRedirectUriAllowed` on the provider's per-tenant
- * `Client` class with wildcard-aware implementations. Call right after `new Provider(...)`.
- *
- * The bodies mirror the v8 fork's patched implementations — the RFC 8252 port-insensitive
- * loopback matching for native clients applies to `redirectUriAllowed` only, matching the
- * behavior Logto has shipped — with two additions: registered URIs containing `*` match through
- * {@link wildcardUrlMatch}, and candidate values containing `*` are always rejected.
+ * Whether a redirect URI value is a wildcard pattern (contains `*`) the runtime matcher
+ * supports. Used by the CIMD `allowClient` policy so remote metadata documents cannot register
+ * patterns the matcher would never match (or overly broad ones such as `*.com`). A plain URI
+ * without `*` is not a wildcard pattern, so it never qualifies.
  */
-export const installWildcardRedirectUriMatching = (provider: Provider) => {
-  const { Client } = provider;
-
-  /* eslint-disable @silverhand/fp/no-mutation -- overriding prototype methods requires mutation */
-  Client.prototype.redirectUriAllowed = function (value: string) {
-    if (value.includes('*')) {
-      return false;
-    }
-
-    const parsed = parseUrl(value);
-    if (!parsed) {
-      return false;
-    }
-
-    const matched = matchAgainstRegistered(this.redirectUris ?? [], parsed);
-
-    if (
-      matched ||
-      this.applicationType !== 'native' ||
-      parsed.protocol !== 'http:' ||
-      !loopbackHostnames.has(parsed.hostname)
-    ) {
-      return matched;
-    }
-
-    parsed.port = '';
-
-    return (this.redirectUris ?? []).some((allowed) => {
-      const registered = parseUrl(allowed);
-      if (!registered) {
-        return false;
-      }
-      registered.port = '';
-      return parsed.href === registered.href;
-    });
-  };
-
-  Client.prototype.postLogoutRedirectUriAllowed = function (value: string) {
-    if (value.includes('*')) {
-      return false;
-    }
-
-    const parsed = parseUrl(value);
-    if (!parsed) {
-      return false;
-    }
-
-    return matchAgainstRegistered(this.postLogoutRedirectUris ?? [], parsed);
-  };
-  /* eslint-enable @silverhand/fp/no-mutation */
-};
+export const isValidWildcardRedirectUriPattern = (pattern: string): boolean =>
+  pattern.includes('*') && parseWildcardUrlPattern(pattern) !== undefined;

@@ -2,11 +2,13 @@ import type { Provider } from 'oidc-provider';
 
 import { createMockProvider } from '#src/test-utils/oidc-provider.js';
 
-import { installWildcardRedirectUriMatching, wildcardUrlMatch } from './wildcard-redirect-uri.js';
+import { installWildcardRedirectUriMatching } from './index.js';
+import { isValidWildcardRedirectUriPattern, wildcardUrlMatch } from './utils.js';
 
 type ClientInstance = InstanceType<Provider['Client']>;
 
 type ClientMetadataStub = {
+  clientId?: string;
   redirectUris?: string[];
   postLogoutRedirectUris?: string[];
   applicationType?: 'web' | 'native';
@@ -17,7 +19,9 @@ installWildcardRedirectUriMatching(provider);
 
 const { redirectUriAllowed, postLogoutRedirectUriAllowed } = provider.Client.prototype;
 
-const asClient = (metadata: ClientMetadataStub) => metadata as ClientInstance;
+const asClient = ({ clientId = 'registered-app', ...metadata }: ClientMetadataStub) =>
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- minimal client stub scoped to the fields the overrides read
+  ({ clientId, ...metadata }) as ClientInstance;
 
 describe('wildcardUrlMatch', () => {
   it('matches a single-label hostname wildcard', () => {
@@ -76,6 +80,24 @@ describe('wildcardUrlMatch', () => {
   });
 });
 
+describe('isValidWildcardRedirectUriPattern', () => {
+  it('accepts patterns the runtime matcher supports', () => {
+    expect(isValidWildcardRedirectUriPattern('https://*.example.com/callback')).toBe(true);
+    expect(isValidWildcardRedirectUriPattern('https://app.example.com/cb/*')).toBe(true);
+  });
+
+  it('rejects patterns the runtime matcher would never match', () => {
+    expect(isValidWildcardRedirectUriPattern('https://*.com/callback')).toBe(false);
+    expect(isValidWildcardRedirectUriPattern('https://example.*/callback')).toBe(false);
+    expect(isValidWildcardRedirectUriPattern('https://app.example.com:*/cb')).toBe(false);
+    expect(isValidWildcardRedirectUriPattern('not-a-url')).toBe(false);
+  });
+
+  it('rejects a plain URI without a wildcard', () => {
+    expect(isValidWildcardRedirectUriPattern('https://app.example.com/callback')).toBe(false);
+  });
+});
+
 describe('redirectUriAllowed override', () => {
   const client = asClient({
     applicationType: 'web',
@@ -105,6 +127,24 @@ describe('redirectUriAllowed override', () => {
     expect(redirectUriAllowed.call(nativeClient, 'http://127.0.0.1:49152/cb')).toBe(true);
     expect(redirectUriAllowed.call(nativeClient, 'http://192.168.0.1:49152/cb')).toBe(false);
   });
+
+  it('keeps the loopback retry native-only for registered applications', () => {
+    const webClient = asClient({
+      applicationType: 'web',
+      redirectUris: ['http://localhost/cb'],
+    });
+
+    expect(redirectUriAllowed.call(webClient, 'http://localhost:49152/cb')).toBe(false);
+  });
+
+  it('keeps normalized exact matching for registered applications', () => {
+    const webClient = asClient({
+      applicationType: 'web',
+      redirectUris: ['https://exact.example.org:443/cb'],
+    });
+
+    expect(redirectUriAllowed.call(webClient, 'https://exact.example.org/cb')).toBe(true);
+  });
 });
 
 describe('postLogoutRedirectUriAllowed override', () => {
@@ -124,6 +164,20 @@ describe('postLogoutRedirectUriAllowed override', () => {
 
   it('rejects candidate values containing a wildcard', () => {
     expect(postLogoutRedirectUriAllowed.call(client, 'https://*.example.com/signed-out')).toBe(
+      false
+    );
+  });
+
+  it('keeps normalized matching without a loopback retry for registered applications', () => {
+    const nativeClient = asClient({
+      applicationType: 'native',
+      postLogoutRedirectUris: ['https://app.example.com:443/signed-out', 'http://localhost/bye'],
+    });
+
+    expect(
+      postLogoutRedirectUriAllowed.call(nativeClient, 'https://app.example.com/signed-out')
+    ).toBe(true);
+    expect(postLogoutRedirectUriAllowed.call(nativeClient, 'http://localhost:49152/bye')).toBe(
       false
     );
   });

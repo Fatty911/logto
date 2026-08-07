@@ -9,14 +9,13 @@ import { userClaims } from '@logto/core-kit';
 import type { I18nKey } from '@logto/phrases';
 import {
   customClientMetadataDefault,
-  CustomClientMetadataKey,
   extraParamsObjectGuard,
   inSeconds,
   logtoCookieKey,
   ExtraParamsKey,
   type Json,
 } from '@logto/schemas';
-import { trySafe, tryThat } from '@silverhand/essentials';
+import { conditional, trySafe, tryThat } from '@silverhand/essentials';
 import { type i18n } from 'i18next';
 import { type KoaContextWithOIDC, Provider, type ResourceServer, errors } from 'oidc-provider';
 import getRawBody from 'raw-body';
@@ -52,10 +51,13 @@ import koaTokenUsageGuard from '../middleware/koa-token-usage-guard.js';
 import {
   appLevelAccessControlMetadataKey,
   assertUserHasApplicationAccessForOidc,
+  extraClientMetadataKeys,
   hasAppLevelAccessControlChecked,
   markAppLevelAccessControlCheckedForOidcContext,
 } from './application-access-control.js';
-import { buildClientIdMetadataDocumentFeature } from './cimd.js';
+import { isCimdClientId } from './cimd/client-id.js';
+import { buildClientIdMetadataDocumentFeature, isCimdEffectivelyEnabled } from './cimd/index.js';
+import { filterResourceScopesForTheCimdClient } from './cimd/resource-scopes.js';
 import defaults from './defaults.js';
 import { deviceFlowConfig, defaultDeviceCodeTtl } from './device-flow.js';
 import {
@@ -65,6 +67,7 @@ import {
 } from './extra-token-claims.js';
 import { getProviderFetchConfig } from './fetch.js';
 import { registerGrants } from './grants/index.js';
+import { installWildcardRedirectUriMatching } from './redirect-uri/index.js';
 import {
   findResource,
   findResourceScopes,
@@ -73,7 +76,6 @@ import {
   filterResourceScopesForTheThirdPartyApplication,
 } from './resource.js';
 import { getAcceptedUserClaims, getUserClaimsData } from './scope.js';
-import { installWildcardRedirectUriMatching } from './wildcard-redirect-uri.js';
 
 // Temporarily removed 'EdDSA' since it's not supported by browser yet
 const supportedSigningAlgs = Object.freeze(['RS256', 'PS256', 'ES256', 'ES384', 'ES512'] as const);
@@ -125,6 +127,22 @@ export default function initOidc(
       userId,
     });
 
+    // DEV: CIMD (client ID metadata document) support
+    if (clientId && isCimdEffectivelyEnabled(envSet) && isCimdClientId(clientId)) {
+      /**
+       * CIMD clients are unregistered: the tenant-wide ceiling replaces the per-application
+       * consent configuration, and the client identifier URL must never be used to query the
+       * applications table (which the third-party check below would do).
+       */
+      const filteredScopes = await filterResourceScopesForTheCimdClient(queries, indicator, scopes);
+
+      return {
+        ...getSharedResourceServerData(envSet),
+        accessTokenTTL,
+        scope: filteredScopes.map(({ name }) => name).join(' '),
+      };
+    }
+
     if (clientId && (await isThirdPartyApplication(queries, clientId))) {
       const filteredScopes = await filterResourceScopesForTheThirdPartyApplication(
         libraries,
@@ -169,6 +187,18 @@ export default function initOidc(
     jwks: {
       keys: envSet.oidc.privateJwks,
     },
+    /**
+     * Clients that skip the adapter's metadata force-write (e.g. CIMD) fall back to the
+     * built-in `RS256` default, which EC-keystore tenants cannot sign. Align the default
+     * with the tenant signing key; RSA tenants keep the built-in `RS256`.
+     */
+    ...conditional(
+      envSet.oidc.jwkSigningAlg && {
+        clientDefaults: {
+          id_token_signed_response_alg: envSet.oidc.jwkSigningAlg,
+        },
+      }
+    ),
     enabledJWA: {
       authorizationSigningAlgValues: [...supportedSigningAlgs],
       userinfoSigningAlgValues: [...supportedSigningAlgs],
@@ -191,7 +221,7 @@ export default function initOidc(
       backchannelLogout: { enabled: true },
       deviceFlow: deviceFlowConfig,
       // DEV: CIMD (client ID metadata document) support
-      ...buildClientIdMetadataDocumentFeature(envSet),
+      ...buildClientIdMetadataDocumentFeature(envSet, queries.cimd),
       rpInitiatedLogout: {
         logoutSource: (ctx, form) => {
           // eslint-disable-next-line no-template-curly-in-string
@@ -340,7 +370,7 @@ export default function initOidc(
       };
     },
     extraClientMetadata: {
-      properties: [...Object.values(CustomClientMetadataKey), appLevelAccessControlMetadataKey],
+      properties: [...extraClientMetadataKeys],
       validator: (_, key, value) => {
         if (key === appLevelAccessControlMetadataKey) {
           if (value === undefined) {
