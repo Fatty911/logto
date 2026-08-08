@@ -25,6 +25,8 @@ import type Queries from '#src/tenants/Queries.js';
 import { extraClientMetadataKeys } from '../application-access-control.js';
 import { isValidWildcardRedirectUriPattern } from '../redirect-uri/utils.js';
 
+import { isCimdClientId } from './client-id.js';
+
 /**
  * Must not exceed the `cimd_client_id varchar(2048)` column width — neither the draft nor the
  * provider defines a maximum, so this bound is what keeps an over-long identifier an
@@ -56,6 +58,50 @@ export const isCimdEffectivelyEnabled = (envSet: EnvSet): boolean =>
   EnvSet.values.isDevFeaturesEnabled &&
   envSet.oidc.cimdEnabled &&
   EnvSet.values.isOidcProviderSsrfProtectionEnabled;
+
+/**
+ * Whether an identifier presented as a `client_id` should be attributed to a CIMD client —
+ * payload builders route it under `cimdClientId` instead of `applicationId`.
+ *
+ * Deliberately ignores the tenant CIMD config, unlike {@link isCimdClient}: attribution
+ * classifies the identifier the requester presented, and the config can flip between the moment
+ * an identifier enters the system and the moment it is attributed (the tenant is rebuilt on
+ * config change), which would retroactively re-route an in-flight URL identifier into
+ * `applicationId` and break its registered-ids-only contract. Gate behavior with
+ * {@link isCimdClient}; use this only to decide where an identifier is recorded.
+ */
+export const shouldAttributeToCimd = (clientId?: string): boolean =>
+  // DEV: CIMD (client ID metadata document) support
+  clientId !== undefined && EnvSet.values.isDevFeaturesEnabled && isCimdClientId(clientId);
+
+/** At most one identifier is set — a registered application id or a CIMD client identifier. */
+export type ClientIdentifierPayload = {
+  applicationId?: string;
+  cimdClientId?: string;
+};
+
+/**
+ * Route a client identifier to the payload key that owns it: `applicationId` carries registered
+ * application ids only, while a CIMD client identifier goes under the dedicated
+ * `cimdClientId` key — audit log and webhook consumers branch on key presence instead
+ * of parsing URL shapes.
+ *
+ * The key attributes the identifier the requester presented, not a resolved client — an identifier
+ * that later fails resolution still lands under `cimdClientId`.
+ */
+export const getClientIdentifierPayload = (clientId?: string): ClientIdentifierPayload =>
+  shouldAttributeToCimd(clientId) ? { cimdClientId: clientId } : { applicationId: clientId };
+
+/**
+ * Whether the identifier names a CIMD client on this tenant's provider: the URL shape only
+ * routes while the feature is effectively enabled, so a URL-shaped identifier stays an ordinary
+ * (and unresolvable) client id otherwise.
+ *
+ * Callers that hold an optional identifier can pass it directly — an absent identifier is never
+ * a CIMD client.
+ */
+export const isCimdClient = (envSet: EnvSet, clientId?: string): boolean =>
+  clientId !== undefined && isCimdEffectivelyEnabled(envSet) && isCimdClientId(clientId);
 
 /**
  * Build the `features.clientIdMetadataDocument` entry for the provider configuration, or

@@ -1,6 +1,7 @@
 import {
   LogResult,
   userInfoSelectFields,
+  type BetterOmit,
   type ExceptionHookEventPayload,
   type GrantLimitExceededEventData,
   type Hook,
@@ -26,10 +27,6 @@ import {
   type HookContext,
 } from './context-manager.js';
 import { generateHookTestPayload, parseResponse, sendWebhookRequest } from './utils.js';
-
-type BetterOmit<T, Ignore> = {
-  [key in keyof T as key extends Ignore ? never : key]: T[key];
-};
 
 type HookEventPayloadWithoutHookId = BetterOmit<HookEventPayload, 'hookId'>;
 
@@ -127,7 +124,8 @@ export const createHookLibrary = (queries: Queries) => {
       return;
     }
 
-    const { interactionEvent, sessionId, applicationId, userIp, userAgent } = metadata;
+    const { interactionEvent, sessionId, applicationId, cimdClientId, userIp, userAgent } =
+      metadata;
 
     const found = await findAllHooks();
 
@@ -173,6 +171,7 @@ export const createHookLibrary = (queries: Queries) => {
         userIp,
         user: user && pick(user, ...userInfoSelectFields),
         application: application && pick(application, 'id', 'type', 'name', 'description'),
+        cimdClientId,
       } satisfies BetterOmit<InteractionHookEventPayload, 'hookId'>;
 
       // eslint-disable-next-line @silverhand/fp/no-mutating-methods
@@ -320,7 +319,11 @@ export const createHookLibrary = (queries: Queries) => {
       return;
     }
 
-    const application = await trySafe(async () => findApplicationById(payload.applicationId));
+    const { applicationId } = payload;
+    /** A CIMD-attributed payload carries no registered application id to enrich with. */
+    const application = conditional(
+      applicationId && (await trySafe(async () => findApplicationById(applicationId)))
+    );
 
     const webhookPayloads = matchingHooks.map((hook) => ({
       hook,

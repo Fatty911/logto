@@ -107,6 +107,89 @@ describe('isCimdEffectivelyEnabled', () => {
   });
 });
 
+describe('shouldAttributeToCimd', () => {
+  const cimdClientId = 'https://client.example.com/metadata.json';
+
+  it('attributes a url-shaped identifier to cimd', async () => {
+    const { shouldAttributeToCimd } = await loadCimdModule();
+    expect(shouldAttributeToCimd(cimdClientId)).toBe(true);
+  });
+
+  it('does not attribute a registered application id or a missing identifier', async () => {
+    const { shouldAttributeToCimd } = await loadCimdModule();
+    expect(shouldAttributeToCimd('app-id')).toBe(false);
+    expect(shouldAttributeToCimd()).toBe(false);
+  });
+
+  it('does not attribute when the dev features flag is off', async () => {
+    const { shouldAttributeToCimd } = await loadCimdModule({ isDevFeaturesEnabled: false });
+    expect(shouldAttributeToCimd(cimdClientId)).toBe(false);
+  });
+
+  it('attributes even when cimd is not effectively enabled for the tenant', async () => {
+    const { shouldAttributeToCimd } = await loadCimdModule({
+      isOidcProviderSsrfProtectionEnabled: false,
+    });
+    expect(shouldAttributeToCimd(cimdClientId)).toBe(true);
+  });
+});
+
+describe('getClientIdentifierPayload', () => {
+  const cimdClientId = 'https://client.example.com/metadata.json';
+
+  it('routes a cimd client identifier to the dedicated key', async () => {
+    const { getClientIdentifierPayload } = await loadCimdModule();
+    expect(getClientIdentifierPayload(cimdClientId)).toStrictEqual({
+      cimdClientId,
+    });
+  });
+
+  it('routes a registered application id to applicationId', async () => {
+    const { getClientIdentifierPayload } = await loadCimdModule();
+    expect(getClientIdentifierPayload('app-id')).toStrictEqual({
+      applicationId: 'app-id',
+    });
+  });
+
+  it('keeps a url-shaped identifier under applicationId when the dev features flag is off', async () => {
+    const { getClientIdentifierPayload } = await loadCimdModule({ isDevFeaturesEnabled: false });
+    expect(getClientIdentifierPayload(cimdClientId)).toStrictEqual({
+      applicationId: cimdClientId,
+    });
+  });
+
+  it('yields an undefined applicationId for a missing identifier', async () => {
+    const { getClientIdentifierPayload } = await loadCimdModule();
+    expect(getClientIdentifierPayload()).toStrictEqual({
+      applicationId: undefined,
+    });
+  });
+});
+
+describe('isCimdClient', () => {
+  const cimdClientId = 'https://client.example.com/client-metadata.json';
+
+  it('is a cimd client when the feature is effective and the identifier is url-shaped', async () => {
+    const { isCimdClient } = await loadCimdModule();
+    expect(isCimdClient(buildEnvSet(true), cimdClientId)).toBe(true);
+  });
+
+  it('is not a cimd client for a registered application id', async () => {
+    const { isCimdClient } = await loadCimdModule();
+    expect(isCimdClient(buildEnvSet(true), 'registered_client_id')).toBe(false);
+  });
+
+  it('is not a cimd client without an identifier', async () => {
+    const { isCimdClient } = await loadCimdModule();
+    expect(isCimdClient(buildEnvSet(true))).toBe(false);
+  });
+
+  it('is not a cimd client when the feature is not effectively enabled', async () => {
+    const { isCimdClient } = await loadCimdModule();
+    expect(isCimdClient(buildEnvSet(false), cimdClientId)).toBe(false);
+  });
+});
+
 describe('buildClientIdMetadataDocumentFeature', () => {
   it('wires the feature with the draft-02 acknowledgement when effectively enabled', async () => {
     const { buildClientIdMetadataDocumentFeature } = await loadCimdModule();
